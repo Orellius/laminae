@@ -217,4 +217,6 @@ Each crate is independent except:
 
 ## License
 
-License TBD — this repository is currently private.
+Licensed under the Apache License, Version 2.0 — see [LICENSE](LICENSE) for details.
+
+Copyright 2025 Orel Ohayon.
