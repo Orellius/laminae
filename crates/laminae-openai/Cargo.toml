@@ -9,7 +9,7 @@ categories = ["api-bindings"]
 description = "OpenAI-compatible backend for the Laminae AI SDK"
 
 [dependencies]
-laminae-psyche = { path = "../laminae-psyche" }
+laminae-psyche = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json.workspace = true
