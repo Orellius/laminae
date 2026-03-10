@@ -9,8 +9,8 @@
 //! model pulled (`ollama pull qwen2.5:7b`). If Ollama is not available,
 //! the example gracefully falls back to direct Ego calls.
 
-use laminae::psyche::{EgoBackend, PsycheConfig, PsycheEngine};
 use laminae::ollama::OllamaClient;
+use laminae::psyche::{EgoBackend, PsycheConfig, PsycheEngine};
 
 /// A simple Ego that echoes its inputs — replace with your real LLM client.
 ///
@@ -38,7 +38,11 @@ impl EgoBackend for EchoEgo {
              Psyche context length: {} chars\n\
              ---\n\
              Psyche context preview:\n{}",
-            if system_prompt.is_empty() { "(none)" } else { system_prompt },
+            if system_prompt.is_empty() {
+                "(none)"
+            } else {
+                system_prompt
+            },
             user_message,
             psyche_context.len(),
             if psyche_context.is_empty() {
@@ -82,16 +86,20 @@ async fn main() -> anyhow::Result<()> {
 
     // Test 2: Medium question — should use COP (compressed) mode
     println!("━━━ Test 2: Medium question (should use COP mode) ━━━\n");
-    let response = engine.reply("How do I implement a binary search tree in Rust?").await?;
+    let response = engine
+        .reply("How do I implement a binary search tree in Rust?")
+        .await?;
     println!("{response}\n");
 
     // Test 3: Complex request — should use full pipeline
     println!("━━━ Test 3: Complex request (should use full pipeline) ━━━\n");
-    let response = engine.reply(
-        "Can you analyze the trade-offs between microservices and monolith architecture \
+    let response = engine
+        .reply(
+            "Can you analyze the trade-offs between microservices and monolith architecture \
          for a payment processing system that needs to handle 10,000 transactions per second \
-         with strict consistency requirements?"
-    ).await?;
+         with strict consistency requirements?",
+        )
+        .await?;
     println!("{response}\n");
 
     Ok(())

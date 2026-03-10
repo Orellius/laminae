@@ -32,60 +32,70 @@ impl CodeBlockExtractor {
                 if c == '`' && self.is_line_start(text, i) {
                     if let Some(fence_end) = self.try_parse_fence(text, i) {
                         let fence_line = &text[i..fence_end];
-                        let backtick_end = fence_line.find(|c: char| c != '`').unwrap_or(fence_line.len());
+                        let backtick_end = fence_line
+                            .find(|c: char| c != '`')
+                            .unwrap_or(fence_line.len());
 
                         if backtick_end >= 3 {
                             let lang_str = fence_line[backtick_end..].trim();
                             block_lang = if lang_str.is_empty() {
                                 None
                             } else {
-                                Some(lang_str.split_whitespace().next().unwrap_or("").to_lowercase())
+                                Some(
+                                    lang_str
+                                        .split_whitespace()
+                                        .next()
+                                        .unwrap_or("")
+                                        .to_lowercase(),
+                                )
                             };
                             block_start = i;
-                            block_content_start = text[fence_end..].find('\n')
+                            block_content_start = text[fence_end..]
+                                .find('\n')
                                 .map(|nl| fence_end + nl + 1)
                                 .unwrap_or(fence_end);
                             in_block = true;
 
                             while let Some(&(j, _)) = chars.peek() {
-                                if j >= block_content_start { break; }
+                                if j >= block_content_start {
+                                    break;
+                                }
                                 chars.next();
                             }
                             continue;
                         }
                     }
                 }
-            } else {
-                if c == '`' && self.is_line_start(text, i) {
-                    let remaining = &text[i..];
-                    let backtick_count = remaining.chars().take_while(|&c| c == '`').count();
-                    if backtick_count >= 3 {
-                        let content = &text[block_content_start..i];
-                        let content = content.strip_suffix('\n').unwrap_or(content);
+            } else if c == '`' && self.is_line_start(text, i) {
+                let remaining = &text[i..];
+                let backtick_count = remaining.chars().take_while(|&c| c == '`').count();
+                if backtick_count >= 3 {
+                    let content = &text[block_content_start..i];
+                    let content = content.strip_suffix('\n').unwrap_or(content);
 
-                        if !content.trim().is_empty() {
-                            blocks.push(ExtractedBlock {
-                                language: block_lang.take(),
-                                content: content.to_string(),
-                                char_offset: block_start,
-                            });
-                        }
-
-                        in_block = false;
-                        block_lang = None;
-
-                        for _ in 0..backtick_count {
-                            chars.next();
-                        }
-                        while let Some(&(_, ch)) = chars.peek() {
-                            chars.next();
-                            if ch == '\n' { break; }
-                        }
-                        continue;
+                    if !content.trim().is_empty() {
+                        blocks.push(ExtractedBlock {
+                            language: block_lang.take(),
+                            content: content.to_string(),
+                            char_offset: block_start,
+                        });
                     }
+
+                    in_block = false;
+                    block_lang = None;
+
+                    for _ in 0..backtick_count {
+                        chars.next();
+                    }
+                    while let Some(&(_, ch)) = chars.peek() {
+                        chars.next();
+                        if ch == '\n' {
+                            break;
+                        }
+                    }
+                    continue;
                 }
             }
-
             chars.next();
         }
 

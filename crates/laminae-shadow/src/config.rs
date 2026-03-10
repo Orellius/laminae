@@ -80,16 +80,36 @@ pub struct ShadowConfig {
     pub config_path: Option<PathBuf>,
 }
 
-fn default_enabled() -> bool { true }
-fn default_level() -> u8 { 2 }
-fn default_true() -> bool { true }
-fn default_shadow_model() -> String { "qwen2.5:14b".to_string() }
-fn default_temperature() -> f32 { 0.05 }
-fn default_max_tokens() -> i32 { 2048 }
-fn default_sandbox_image() -> String { "python:3.12-slim".to_string() }
-fn default_sandbox_ttl() -> u64 { 30 }
-fn default_min_code_len() -> usize { 100 }
-fn default_max_input_len() -> usize { 4000 }
+fn default_enabled() -> bool {
+    true
+}
+fn default_level() -> u8 {
+    2
+}
+fn default_true() -> bool {
+    true
+}
+fn default_shadow_model() -> String {
+    "qwen2.5:14b".to_string()
+}
+fn default_temperature() -> f32 {
+    0.05
+}
+fn default_max_tokens() -> i32 {
+    2048
+}
+fn default_sandbox_image() -> String {
+    "python:3.12-slim".to_string()
+}
+fn default_sandbox_ttl() -> u64 {
+    30
+}
+fn default_min_code_len() -> usize {
+    100
+}
+fn default_max_input_len() -> usize {
+    4000
+}
 
 impl Default for ShadowConfig {
     fn default() -> Self {
@@ -126,17 +146,19 @@ impl ShadowConfig {
                 config.clamp();
                 config
             }
-            Err(_) => {
-                let mut config = Self::default();
-                config.config_path = Some(path);
-                config
-            }
+            Err(_) => Self {
+                config_path: Some(path),
+                ..Self::default()
+            },
         }
     }
 
     /// Persist config to disk.
     pub fn save(&self) -> anyhow::Result<()> {
-        let path = self.config_path.clone().unwrap_or_else(Self::default_config_path);
+        let path = self
+            .config_path
+            .clone()
+            .unwrap_or_else(Self::default_config_path);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }

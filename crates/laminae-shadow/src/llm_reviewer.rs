@@ -37,8 +37,12 @@ struct LlmFinding {
     remediation: String,
 }
 
-fn default_category() -> String { "unknown".to_string() }
-fn default_severity() -> String { "medium".to_string() }
+fn default_category() -> String {
+    "unknown".to_string()
+}
+fn default_severity() -> String {
+    "medium".to_string()
+}
 
 impl LlmReviewer {
     pub fn new(ollama: OllamaClient, config: &ShadowConfig) -> Self {
@@ -62,7 +66,11 @@ impl LlmReviewer {
             id: generate_id(),
             category: parse_category(&lf.category),
             severity: parse_severity(&lf.severity),
-            title: if lf.title.is_empty() { "LLM-detected issue".to_string() } else { lf.title },
+            title: if lf.title.is_empty() {
+                "LLM-detected issue".to_string()
+            } else {
+                lf.title
+            },
             description: lf.description,
             evidence: truncate(&lf.evidence, 200),
             line: None,
@@ -74,7 +82,9 @@ impl LlmReviewer {
 }
 
 impl Analyzer for LlmReviewer {
-    fn name(&self) -> &'static str { "llm_reviewer" }
+    fn name(&self) -> &'static str {
+        "llm_reviewer"
+    }
 
     async fn is_available(&self) -> bool {
         self.ollama.has_model(&self.model).await
@@ -89,8 +99,15 @@ impl Analyzer for LlmReviewer {
         let code_summary = format_code_blocks(code_blocks);
         let user_prompt = build_shadow_prompt(&truncated_output, &code_summary);
 
-        let response = self.ollama
-            .complete(&self.model, SHADOW_SYSTEM_PROMPT, &user_prompt, self.temperature, self.max_tokens)
+        let response = self
+            .ollama
+            .complete(
+                &self.model,
+                SHADOW_SYSTEM_PROMPT,
+                &user_prompt,
+                self.temperature,
+                self.max_tokens,
+            )
             .await
             .map_err(|e| AnalyzerError::LlmReview(e.to_string()))?;
 
@@ -153,7 +170,11 @@ fn parse_severity(s: &str) -> VulnSeverity {
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.len() > max { format!("{}...", &s[..max]) } else { s.to_string() }
+    if s.len() > max {
+        format!("{}...", &s[..max])
+    } else {
+        s.to_string()
+    }
 }
 
 fn generate_id() -> String {

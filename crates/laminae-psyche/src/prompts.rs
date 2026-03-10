@@ -20,25 +20,58 @@ pub enum ResponseTier {
 
 /// Known patterns that should skip Psyche entirely.
 const FAST_SKIP: &[&str] = &[
-    "hello", "hi", "hey", "yo", "sup",
-    "thanks", "thank you", "thx", "ty",
-    "ok", "okay", "sure", "yes", "no",
-    "good morning", "good night", "gm", "gn",
-    "bye", "goodbye", "see you", "later",
-    "what time", "what date", "what day",
-    "how are you", "how's it going",
+    "hello",
+    "hi",
+    "hey",
+    "yo",
+    "sup",
+    "thanks",
+    "thank you",
+    "thx",
+    "ty",
+    "ok",
+    "okay",
+    "sure",
+    "yes",
+    "no",
+    "good morning",
+    "good night",
+    "gm",
+    "gn",
+    "bye",
+    "goodbye",
+    "see you",
+    "later",
+    "what time",
+    "what date",
+    "what day",
+    "how are you",
+    "how's it going",
 ];
 
 /// Prefixes that indicate factual/lookup queries (skip Psyche).
 const FACTUAL_STARTS: &[&str] = &[
-    "what is ", "what are ", "what was ", "what were ",
-    "who is ", "who are ", "who was ",
-    "when is ", "when was ", "when did ",
-    "where is ", "where are ", "where was ",
-    "how many ", "how much ", "how old ",
-    "define ", "meaning of ",
+    "what is ",
+    "what are ",
+    "what was ",
+    "what were ",
+    "who is ",
+    "who are ",
+    "who was ",
+    "when is ",
+    "when was ",
+    "when did ",
+    "where is ",
+    "where are ",
+    "where was ",
+    "how many ",
+    "how much ",
+    "how old ",
+    "define ",
+    "meaning of ",
     "translate ",
-    "convert ", "calculate ",
+    "convert ",
+    "calculate ",
 ];
 
 /// Should this message skip Psyche entirely?
@@ -46,7 +79,10 @@ pub fn should_skip_psyche(message: &str) -> bool {
     let lower = message.trim().to_lowercase();
 
     // Known greetings/simple responses
-    if FAST_SKIP.iter().any(|p| lower == *p || lower.starts_with(&format!("{p} "))) {
+    if FAST_SKIP
+        .iter()
+        .any(|p| lower == *p || lower.starts_with(&format!("{p} ")))
+    {
         return true;
     }
 
@@ -70,11 +106,27 @@ pub fn classify_tier(message: &str) -> ResponseTier {
     // Messages with complex intent markers → Full
     let lower = message.to_lowercase();
     let complex_markers = [
-        "explain", "analyze", "compare", "design", "architect",
-        "refactor", "review", "debug", "implement", "build",
-        "strategy", "plan", "optimize", "evaluate", "critique",
-        "help me think", "what do you think", "your opinion",
-        "pros and cons", "trade-offs", "tradeoffs",
+        "explain",
+        "analyze",
+        "compare",
+        "design",
+        "architect",
+        "refactor",
+        "review",
+        "debug",
+        "implement",
+        "build",
+        "strategy",
+        "plan",
+        "optimize",
+        "evaluate",
+        "critique",
+        "help me think",
+        "what do you think",
+        "your opinion",
+        "pros and cons",
+        "trade-offs",
+        "tradeoffs",
     ];
 
     if complex_markers.iter().any(|m| lower.contains(m)) {
@@ -154,11 +206,7 @@ If must block, say VERDICT: BLOCK and explain why."
 // ── Ego Context Building ──
 
 /// Build Ego context from full Id/Superego output.
-pub fn ego_context(
-    id_output: &str,
-    superego_output: &str,
-    config: &PsycheConfig,
-) -> String {
+pub fn ego_context(id_output: &str, superego_output: &str, config: &PsycheConfig) -> String {
     let weight_note = config.weight_instruction();
     let mut ctx = String::with_capacity(id_output.len() + superego_output.len() + 200);
 
@@ -183,11 +231,7 @@ pub fn ego_context(
 }
 
 /// Build Ego context from COP-formatted Id/Superego output.
-pub fn ego_context_cop(
-    id_output: &str,
-    superego_output: &str,
-    config: &PsycheConfig,
-) -> String {
+pub fn ego_context_cop(id_output: &str, superego_output: &str, config: &PsycheConfig) -> String {
     let weight_note = config.weight_instruction();
     let mut ctx = String::with_capacity(id_output.len() + superego_output.len() + 200);
 
@@ -260,8 +304,12 @@ mod tests {
 
     #[test]
     fn test_no_skip_complex() {
-        assert!(!should_skip_psyche("Help me design a microservice architecture for a payment system"));
-        assert!(!should_skip_psyche("I need you to analyze this code for security vulnerabilities"));
+        assert!(!should_skip_psyche(
+            "Help me design a microservice architecture for a payment system"
+        ));
+        assert!(!should_skip_psyche(
+            "I need you to analyze this code for security vulnerabilities"
+        ));
     }
 
     #[test]

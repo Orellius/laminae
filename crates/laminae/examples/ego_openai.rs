@@ -9,8 +9,8 @@
 //! - `OPENAI_API_KEY` environment variable
 //! - Ollama running locally (for Id/Superego)
 
-use laminae::psyche::{EgoBackend, PsycheConfig, PsycheEngine};
 use laminae::ollama::OllamaClient;
+use laminae::psyche::{EgoBackend, PsycheConfig, PsycheEngine};
 use tokio::sync::mpsc;
 
 /// OpenAI Ego backend — calls the Chat Completions API.
@@ -53,7 +53,8 @@ impl EgoBackend for OpenAIEgo {
             ]
         });
 
-        let req = self.http
+        let req = self
+            .http
             .post("https://api.openai.com/v1/chat/completions")
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("content-type", "application/json")
@@ -103,7 +104,8 @@ impl EgoBackend for OpenAIEgo {
             ]
         });
 
-        let req = self.http
+        let req = self
+            .http
             .post("https://api.openai.com/v1/chat/completions")
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("content-type", "application/json")
@@ -154,7 +156,9 @@ impl EgoBackend for OpenAIEgo {
                                 .and_then(|a| a.first())
                                 .and_then(|c| c["delta"]["content"].as_str())
                             {
-                                if !content.is_empty() && tx.send(content.to_string()).await.is_err() {
+                                if !content.is_empty()
+                                    && tx.send(content.to_string()).await.is_err()
+                                {
                                     return;
                                 }
                             }
@@ -174,8 +178,7 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter("laminae=info")
         .init();
 
-    let api_key = std::env::var("OPENAI_API_KEY")
-        .expect("Set OPENAI_API_KEY environment variable");
+    let api_key = std::env::var("OPENAI_API_KEY").expect("Set OPENAI_API_KEY environment variable");
 
     let ollama = OllamaClient::new();
     let ego = OpenAIEgo::new(api_key);
@@ -193,17 +196,19 @@ async fn main() -> anyhow::Result<()> {
 
     // Complex message — full Psyche pipeline
     println!("━━━ Full Pipeline (Id + Superego → GPT-4o) ━━━\n");
-    let response = engine.reply(
-        "Compare the trade-offs between using Rust and Go for building \
-         a high-throughput message queue system."
-    ).await?;
+    let response = engine
+        .reply(
+            "Compare the trade-offs between using Rust and Go for building \
+         a high-throughput message queue system.",
+        )
+        .await?;
     println!("{response}\n");
 
     // Streaming example
     println!("━━━ Streaming ━━━\n");
-    let mut rx = engine.reply_streaming(
-        "Explain monads in one paragraph."
-    ).await?;
+    let mut rx = engine
+        .reply_streaming("Explain monads in one paragraph.")
+        .await?;
 
     use laminae::psyche::PsycheEvent;
     while let Some(event) = rx.recv().await {

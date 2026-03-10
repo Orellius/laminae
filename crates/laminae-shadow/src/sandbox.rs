@@ -27,7 +27,9 @@ impl SandboxManager {
 }
 
 impl Analyzer for SandboxManager {
-    fn name(&self) -> &'static str { "sandbox" }
+    fn name(&self) -> &'static str {
+        "sandbox"
+    }
 
     async fn is_available(&self) -> bool {
         if !self.enabled {
@@ -77,7 +79,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_sandbox_disabled() {
-        let config = ShadowConfig { sandbox_enabled: false, ..Default::default() };
+        let config = ShadowConfig {
+            sandbox_enabled: false,
+            ..Default::default()
+        };
         let sandbox = SandboxManager::new(&config);
         assert!(!sandbox.is_available().await);
         assert!(sandbox.analyze("test", &[]).await.unwrap().is_empty());

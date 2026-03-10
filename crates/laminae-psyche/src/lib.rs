@@ -60,10 +60,8 @@ use tokio::sync::mpsc;
 
 use laminae_ollama::OllamaClient;
 use prompts::{
-    ego_context, ego_context_cop,
-    id_prompt, id_prompt_cop,
-    superego_prompt, superego_prompt_cop,
-    ResponseTier, classify_tier, should_skip_psyche,
+    classify_tier, ego_context, ego_context_cop, id_prompt, id_prompt_cop, should_skip_psyche,
+    superego_prompt, superego_prompt_cop, ResponseTier,
 };
 
 // ── Traits — Bring Your Own Backend ──
@@ -92,7 +90,9 @@ pub trait EgoBackend: Send + Sync {
         psyche_context: &str,
     ) -> impl std::future::Future<Output = Result<mpsc::Receiver<String>>> + Send {
         async {
-            let result = self.complete(system_prompt, user_message, psyche_context).await?;
+            let result = self
+                .complete(system_prompt, user_message, psyche_context)
+                .await?;
             let (tx, rx) = mpsc::channel(1);
             let _ = tx.send(result).await;
             Ok(rx)
@@ -179,16 +179,36 @@ pub struct PsycheConfig {
     pub ego_system_prompt: String,
 }
 
-fn default_id_model() -> String { "qwen2.5:7b".to_string() }
-fn default_superego_model() -> String { "qwen2.5:7b".to_string() }
-fn default_id_temp() -> f32 { 0.9 }
-fn default_superego_temp() -> f32 { 0.3 }
-fn default_id_tokens() -> i32 { 512 }
-fn default_superego_tokens() -> i32 { 256 }
-fn default_id_weight() -> f32 { 0.6 }
-fn default_superego_weight() -> f32 { 0.4 }
-fn default_cop_tokens() -> i32 { 80 }
-fn default_cop_timeout() -> u64 { 15 }
+fn default_id_model() -> String {
+    "qwen2.5:7b".to_string()
+}
+fn default_superego_model() -> String {
+    "qwen2.5:7b".to_string()
+}
+fn default_id_temp() -> f32 {
+    0.9
+}
+fn default_superego_temp() -> f32 {
+    0.3
+}
+fn default_id_tokens() -> i32 {
+    512
+}
+fn default_superego_tokens() -> i32 {
+    256
+}
+fn default_id_weight() -> f32 {
+    0.6
+}
+fn default_superego_weight() -> f32 {
+    0.4
+}
+fn default_cop_tokens() -> i32 {
+    80
+}
+fn default_cop_timeout() -> u64 {
+    15
+}
 
 impl Default for PsycheConfig {
     fn default() -> Self {
@@ -249,8 +269,10 @@ impl PsycheConfig {
         };
         format!(
             "Creative influence: {} ({:.0}%). Safety influence: {} ({:.0}%).",
-            id_desc, self.id_weight * 100.0,
-            superego_desc, self.superego_weight * 100.0,
+            id_desc,
+            self.id_weight * 100.0,
+            superego_desc,
+            self.superego_weight * 100.0,
         )
     }
 }
@@ -371,7 +393,10 @@ impl<E: EgoBackend + 'static> PsycheEngine<E> {
         );
 
         let id_output = id_result.ok().and_then(|r| r.ok()).unwrap_or_default();
-        let superego_output = superego_result.ok().and_then(|r| r.ok()).unwrap_or_default();
+        let superego_output = superego_result
+            .ok()
+            .and_then(|r| r.ok())
+            .unwrap_or_default();
 
         // Check for BLOCK verdict from Superego
         if let Some(block_reason) = prompts::extract_block_reason(&superego_output) {
@@ -384,15 +409,15 @@ impl<E: EgoBackend + 'static> PsycheEngine<E> {
             None => context,
         };
 
-        self.ego.complete(&self.config.ego_system_prompt, user_message, &full_context).await
+        self.ego
+            .complete(&self.config.ego_system_prompt, user_message, &full_context)
+            .await
     }
 
     /// Full pipeline — complete Id + Superego prose.
     async fn reply_full(&self, user_message: &str) -> Result<String> {
-        let (id_result, superego_result) = tokio::join!(
-            self.run_id(user_message),
-            self.run_superego(user_message),
-        );
+        let (id_result, superego_result) =
+            tokio::join!(self.run_id(user_message), self.run_superego(user_message),);
 
         let id_output = id_result.unwrap_or_default();
         let superego_output = superego_result.unwrap_or_default();
@@ -407,23 +432,29 @@ impl<E: EgoBackend + 'static> PsycheEngine<E> {
             None => context,
         };
 
-        self.ego.complete(&self.config.ego_system_prompt, user_message, &full_context).await
+        self.ego
+            .complete(&self.config.ego_system_prompt, user_message, &full_context)
+            .await
     }
 
     /// Reply with streaming events for UI telemetry.
-    pub async fn reply_streaming(
-        &self,
-        user_message: &str,
-    ) -> Result<mpsc::Receiver<PsycheEvent>> {
+    pub async fn reply_streaming(&self, user_message: &str) -> Result<mpsc::Receiver<PsycheEvent>> {
         let (tx, rx) = mpsc::channel::<PsycheEvent>(64);
 
         if should_skip_psyche(user_message) {
-            let _ = tx.send(PsycheEvent::PhaseChange { phase: Phase::Responding }).await;
-            let ego_rx = self.ego.complete_streaming(
-                &self.config.ego_system_prompt,
-                user_message,
-                self.extra_context.as_deref().unwrap_or(""),
-            ).await?;
+            let _ = tx
+                .send(PsycheEvent::PhaseChange {
+                    phase: Phase::Responding,
+                })
+                .await;
+            let ego_rx = self
+                .ego
+                .complete_streaming(
+                    &self.config.ego_system_prompt,
+                    user_message,
+                    self.extra_context.as_deref().unwrap_or(""),
+                )
+                .await?;
             Self::forward_ego_chunks(tx, ego_rx);
             return Ok(rx);
         }
@@ -436,19 +467,29 @@ impl<E: EgoBackend + 'static> PsycheEngine<E> {
         let extra = self.extra_context.clone();
 
         tokio::spawn(async move {
-            let _ = tx.send(PsycheEvent::PhaseChange { phase: Phase::Thinking }).await;
+            let _ = tx
+                .send(PsycheEvent::PhaseChange {
+                    phase: Phase::Thinking,
+                })
+                .await;
 
             let (id_output, superego_output) = match tier {
                 ResponseTier::Skip => (String::new(), String::new()),
                 ResponseTier::Light => {
                     let timeout = std::time::Duration::from_secs(config.cop_timeout_secs);
                     let id_fut = ollama.complete(
-                        &config.id_model, id_prompt_cop(), &user_msg,
-                        config.id_temperature, config.cop_max_tokens,
+                        &config.id_model,
+                        id_prompt_cop(),
+                        &user_msg,
+                        config.id_temperature,
+                        config.cop_max_tokens,
                     );
                     let superego_fut = ollama.complete(
-                        &config.superego_model, superego_prompt_cop(), &user_msg,
-                        config.superego_temperature, config.cop_max_tokens,
+                        &config.superego_model,
+                        superego_prompt_cop(),
+                        &user_msg,
+                        config.superego_temperature,
+                        config.cop_max_tokens,
                     );
                     let (id_r, se_r) = tokio::join!(
                         tokio::time::timeout(timeout, id_fut),
@@ -461,25 +502,40 @@ impl<E: EgoBackend + 'static> PsycheEngine<E> {
                 }
                 ResponseTier::Full => {
                     let id_fut = ollama.complete(
-                        &config.id_model, id_prompt(), &user_msg,
-                        config.id_temperature, config.id_max_tokens,
+                        &config.id_model,
+                        id_prompt(),
+                        &user_msg,
+                        config.id_temperature,
+                        config.id_max_tokens,
                     );
                     let superego_fut = ollama.complete(
-                        &config.superego_model, superego_prompt(), &user_msg,
-                        config.superego_temperature, config.superego_max_tokens,
+                        &config.superego_model,
+                        superego_prompt(),
+                        &user_msg,
+                        config.superego_temperature,
+                        config.superego_max_tokens,
                     );
                     let (id_r, se_r) = tokio::join!(id_fut, superego_fut);
-                    (
-                        id_r.unwrap_or_default(),
-                        se_r.unwrap_or_default(),
-                    )
+                    (id_r.unwrap_or_default(), se_r.unwrap_or_default())
                 }
             };
 
-            let _ = tx.send(PsycheEvent::IdDone { full_text: id_output.clone() }).await;
+            let _ = tx
+                .send(PsycheEvent::IdDone {
+                    full_text: id_output.clone(),
+                })
+                .await;
 
-            let _ = tx.send(PsycheEvent::PhaseChange { phase: Phase::EnsuringSafety }).await;
-            let _ = tx.send(PsycheEvent::SuperegoDone { full_text: superego_output.clone() }).await;
+            let _ = tx
+                .send(PsycheEvent::PhaseChange {
+                    phase: Phase::EnsuringSafety,
+                })
+                .await;
+            let _ = tx
+                .send(PsycheEvent::SuperegoDone {
+                    full_text: superego_output.clone(),
+                })
+                .await;
 
             if let Some(block_reason) = prompts::extract_block_reason(&superego_output) {
                 let _ = tx.send(PsycheEvent::EgoChunk { text: block_reason }).await;
@@ -490,9 +546,7 @@ impl<E: EgoBackend + 'static> PsycheEngine<E> {
                 ResponseTier::Light | ResponseTier::Skip => {
                     ego_context_cop(&id_output, &superego_output, &config)
                 }
-                ResponseTier::Full => {
-                    ego_context(&id_output, &superego_output, &config)
-                }
+                ResponseTier::Full => ego_context(&id_output, &superego_output, &config),
             };
 
             let full_context = match &extra {
@@ -500,21 +554,34 @@ impl<E: EgoBackend + 'static> PsycheEngine<E> {
                 None => context,
             };
 
-            let _ = tx.send(PsycheEvent::PhaseChange { phase: Phase::Responding }).await;
+            let _ = tx
+                .send(PsycheEvent::PhaseChange {
+                    phase: Phase::Responding,
+                })
+                .await;
 
-            match ego.complete_streaming(&config.ego_system_prompt, &user_msg, &full_context).await {
+            match ego
+                .complete_streaming(&config.ego_system_prompt, &user_msg, &full_context)
+                .await
+            {
                 Ok(mut ego_rx) => {
                     while let Some(chunk) = ego_rx.recv().await {
-                        if tx.send(PsycheEvent::EgoChunk { text: chunk }).await.is_err() {
+                        if tx
+                            .send(PsycheEvent::EgoChunk { text: chunk })
+                            .await
+                            .is_err()
+                        {
                             break;
                         }
                     }
                 }
                 Err(e) => {
                     tracing::error!("Ego streaming error: {e}");
-                    let _ = tx.send(PsycheEvent::EgoChunk {
-                        text: format!("Error: {e}"),
-                    }).await;
+                    let _ = tx
+                        .send(PsycheEvent::EgoChunk {
+                            text: format!("Error: {e}"),
+                        })
+                        .await;
                 }
             }
         });
@@ -525,49 +592,61 @@ impl<E: EgoBackend + 'static> PsycheEngine<E> {
     // ── Internal Helpers ──
 
     async fn run_id(&self, user_message: &str) -> Result<String> {
-        self.ollama.complete(
-            &self.config.id_model,
-            id_prompt(),
-            user_message,
-            self.config.id_temperature,
-            self.config.id_max_tokens,
-        ).await
+        self.ollama
+            .complete(
+                &self.config.id_model,
+                id_prompt(),
+                user_message,
+                self.config.id_temperature,
+                self.config.id_max_tokens,
+            )
+            .await
     }
 
     async fn run_superego(&self, user_message: &str) -> Result<String> {
-        self.ollama.complete(
-            &self.config.superego_model,
-            superego_prompt(),
-            user_message,
-            self.config.superego_temperature,
-            self.config.superego_max_tokens,
-        ).await
+        self.ollama
+            .complete(
+                &self.config.superego_model,
+                superego_prompt(),
+                user_message,
+                self.config.superego_temperature,
+                self.config.superego_max_tokens,
+            )
+            .await
     }
 
     async fn run_id_cop(&self, user_message: &str) -> Result<String> {
-        self.ollama.complete(
-            &self.config.id_model,
-            id_prompt_cop(),
-            user_message,
-            self.config.id_temperature,
-            self.config.cop_max_tokens,
-        ).await
+        self.ollama
+            .complete(
+                &self.config.id_model,
+                id_prompt_cop(),
+                user_message,
+                self.config.id_temperature,
+                self.config.cop_max_tokens,
+            )
+            .await
     }
 
     async fn run_superego_cop(&self, user_message: &str) -> Result<String> {
-        self.ollama.complete(
-            &self.config.superego_model,
-            superego_prompt_cop(),
-            user_message,
-            self.config.superego_temperature,
-            self.config.cop_max_tokens,
-        ).await
+        self.ollama
+            .complete(
+                &self.config.superego_model,
+                superego_prompt_cop(),
+                user_message,
+                self.config.superego_temperature,
+                self.config.cop_max_tokens,
+            )
+            .await
     }
 
     fn forward_ego_chunks(tx: mpsc::Sender<PsycheEvent>, mut ego_rx: mpsc::Receiver<String>) {
         tokio::spawn(async move {
             while let Some(chunk) = ego_rx.recv().await {
-                if tx.send(PsycheEvent::EgoChunk { text: chunk }).await.is_err() {
+                if tx
+                    .send(PsycheEvent::EgoChunk { text: chunk })
+                    .await
+                    .is_err()
+                {
                     break;
                 }
             }
@@ -582,7 +661,12 @@ mod tests {
     struct MockEgo;
 
     impl EgoBackend for MockEgo {
-        fn complete(&self, _system: &str, user_msg: &str, _ctx: &str) -> impl std::future::Future<Output = Result<String>> + Send {
+        fn complete(
+            &self,
+            _system: &str,
+            user_msg: &str,
+            _ctx: &str,
+        ) -> impl std::future::Future<Output = Result<String>> + Send {
             let msg = format!("Echo: {user_msg}");
             async move { Ok(msg) }
         }

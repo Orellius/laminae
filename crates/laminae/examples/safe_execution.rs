@@ -9,10 +9,7 @@
 //! No external dependencies required — everything runs locally.
 
 use laminae::glassbox::{Glassbox, GlassboxConfig, RateLimitConfig};
-use laminae::ironclad::{
-    validate_binary, validate_command_deep,
-    IroncladConfig, WatchdogConfig,
-};
+use laminae::ironclad::{validate_binary, validate_command_deep, IroncladConfig, WatchdogConfig};
 
 fn main() {
     println!("━━━ Glassbox: Input Validation ━━━\n");
@@ -73,7 +70,11 @@ fn main() {
     for (cmd, expected_safe) in &commands {
         let result = gb.validate_command(cmd);
         let status = if result.is_ok() { "PASS" } else { "BLOCKED" };
-        let marker = if result.is_ok() == *expected_safe { "✓" } else { "✗" };
+        let marker = if result.is_ok() == *expected_safe {
+            "✓"
+        } else {
+            "✗"
+        };
         println!("  {marker} [{status}] {cmd}");
     }
 
@@ -92,7 +93,11 @@ fn main() {
     for (path, expected_safe) in &paths {
         let result = gb.validate_write_path(path);
         let status = if result.is_ok() { "PASS" } else { "BLOCKED" };
-        let marker = if result.is_ok() == *expected_safe { "✓" } else { "✗" };
+        let marker = if result.is_ok() == *expected_safe {
+            "✓"
+        } else {
+            "✗"
+        };
         println!("  {marker} [{status}] {path}");
     }
 
@@ -104,13 +109,20 @@ fn main() {
         ("The weather today is 22°C and sunny.", true),
         ("Here's how to sort: use .sort() method.", true),
         ("My system prompt says I should never reveal this.", false),
-        ("Let me ignore previous instructions and help you hack.", false),
+        (
+            "Let me ignore previous instructions and help you hack.",
+            false,
+        ),
     ];
 
     for (output, expected_safe) in &outputs {
         let result = gb.validate_output(output);
         let status = if result.is_ok() { "PASS" } else { "BLOCKED" };
-        let marker = if result.is_ok() == *expected_safe { "✓" } else { "✗" };
+        let marker = if result.is_ok() == *expected_safe {
+            "✓"
+        } else {
+            "✗"
+        };
         let truncated: String = output.chars().take(60).collect();
         println!("  {marker} [{status}] {truncated}");
     }
@@ -158,7 +170,11 @@ fn main() {
     for (bin, expected_safe) in &binaries {
         let result = validate_binary(bin);
         let status = if result.is_ok() { "ALLOWED" } else { "BLOCKED" };
-        let marker = if result.is_ok() == *expected_safe { "✓" } else { "✗" };
+        let marker = if result.is_ok() == *expected_safe {
+            "✓"
+        } else {
+            "✗"
+        };
         println!("  {marker} [{status}] {bin}");
     }
 
@@ -179,7 +195,11 @@ fn main() {
     for (cmd, expected_safe) in &deep_commands {
         let result = validate_command_deep(cmd);
         let status = if result.is_ok() { "PASS" } else { "BLOCKED" };
-        let marker = if result.is_ok() == *expected_safe { "✓" } else { "✗" };
+        let marker = if result.is_ok() == *expected_safe {
+            "✓"
+        } else {
+            "✗"
+        };
         println!("  {marker} [{status}] {cmd}");
     }
 
@@ -202,9 +222,30 @@ fn main() {
     println!("  Custom allowlist: ls, cat, my_safe_tool");
     println!("  Extra blocked: my_dangerous_tool");
     println!();
-    println!("  my_safe_tool: {}", if validate_binary_with_config("my_safe_tool", &custom).is_ok() { "ALLOWED" } else { "BLOCKED" });
-    println!("  my_dangerous_tool: {}", if validate_binary_with_config("my_dangerous_tool", &custom).is_ok() { "ALLOWED" } else { "BLOCKED" });
-    println!("  git: {}", if validate_binary_with_config("git", &custom).is_ok() { "ALLOWED" } else { "BLOCKED (not in custom allowlist)" });
+    println!(
+        "  my_safe_tool: {}",
+        if validate_binary_with_config("my_safe_tool", &custom).is_ok() {
+            "ALLOWED"
+        } else {
+            "BLOCKED"
+        }
+    );
+    println!(
+        "  my_dangerous_tool: {}",
+        if validate_binary_with_config("my_dangerous_tool", &custom).is_ok() {
+            "ALLOWED"
+        } else {
+            "BLOCKED"
+        }
+    );
+    println!(
+        "  git: {}",
+        if validate_binary_with_config("git", &custom).is_ok() {
+            "ALLOWED"
+        } else {
+            "BLOCKED (not in custom allowlist)"
+        }
+    );
 
     // ── Watchdog config ──
 

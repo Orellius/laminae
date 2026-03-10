@@ -10,8 +10,8 @@
 //! - `ANTHROPIC_API_KEY` environment variable
 //! - Ollama running locally (for Id/Superego)
 
-use laminae::psyche::{EgoBackend, PsycheConfig, PsycheEngine};
 use laminae::ollama::OllamaClient;
+use laminae::psyche::{EgoBackend, PsycheConfig, PsycheEngine};
 
 /// Claude Ego backend — calls the Anthropic Messages API.
 struct ClaudeEgo {
@@ -63,7 +63,8 @@ impl EgoBackend for ClaudeEgo {
             }]
         });
 
-        let req = self.http
+        let req = self
+            .http
             .post("https://api.anthropic.com/v1/messages")
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
@@ -99,8 +100,8 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter("laminae=info")
         .init();
 
-    let api_key = std::env::var("ANTHROPIC_API_KEY")
-        .expect("Set ANTHROPIC_API_KEY environment variable");
+    let api_key =
+        std::env::var("ANTHROPIC_API_KEY").expect("Set ANTHROPIC_API_KEY environment variable");
 
     let ollama = OllamaClient::new();
     let ego = ClaudeEgo::new(api_key);
@@ -123,10 +124,12 @@ async fn main() -> anyhow::Result<()> {
 
     // Complex message — full pipeline
     println!("━━━ Complex (full pipeline) ━━━");
-    let response = engine.reply(
-        "Analyze the security implications of using JWT tokens stored in localStorage \
-         versus httpOnly cookies for a banking application."
-    ).await?;
+    let response = engine
+        .reply(
+            "Analyze the security implications of using JWT tokens stored in localStorage \
+         versus httpOnly cookies for a banking application.",
+        )
+        .await?;
     println!("{response}\n");
 
     Ok(())

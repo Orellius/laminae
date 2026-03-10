@@ -155,9 +155,9 @@ impl OllamaClient {
             Ok(resp) => {
                 if let Ok(tags) = resp.json::<TagsResponse>().await {
                     if let Some(models) = tags.models {
-                        return models.iter().any(|m| {
-                            m.name == model || m.name.starts_with(&format!("{model}:"))
-                        });
+                        return models
+                            .iter()
+                            .any(|m| m.name == model || m.name.starts_with(&format!("{model}:")));
                     }
                 }
                 false
@@ -180,18 +180,29 @@ impl OllamaClient {
         let body = ChatRequest {
             model,
             messages: vec![
-                ChatMessage { role: "system", content: system },
-                ChatMessage { role: "user", content: user_message },
+                ChatMessage {
+                    role: "system",
+                    content: system,
+                },
+                ChatMessage {
+                    role: "user",
+                    content: user_message,
+                },
             ],
             stream: false,
-            options: ChatOptions { temperature, num_predict: max_tokens },
+            options: ChatOptions {
+                temperature,
+                num_predict: max_tokens,
+            },
         };
 
         match self.send_request(&body).await {
             Ok(text) => return Ok(text),
             Err(e) => {
                 if Self::is_retryable(&e) {
-                    tracing::warn!("Ollama retryable error: {e} — retrying in {RETRY_BACKOFF_MS}ms");
+                    tracing::warn!(
+                        "Ollama retryable error: {e} — retrying in {RETRY_BACKOFF_MS}ms"
+                    );
                     tokio::time::sleep(std::time::Duration::from_millis(RETRY_BACKOFF_MS)).await;
                 } else {
                     return Err(e);
@@ -219,7 +230,10 @@ impl OllamaClient {
             model,
             messages: chat_messages,
             stream: false,
-            options: ChatOptions { temperature, num_predict: max_tokens },
+            options: ChatOptions {
+                temperature,
+                num_predict: max_tokens,
+            },
         };
 
         self.send_request(&body).await
@@ -241,12 +255,12 @@ impl OllamaClient {
             anyhow::bail!("Ollama error ({}): {}", status.as_u16(), body_text);
         }
 
-        let response: ChatResponse = resp.json().await.context("Failed to parse Ollama response")?;
+        let response: ChatResponse = resp
+            .json()
+            .await
+            .context("Failed to parse Ollama response")?;
 
-        let text = response
-            .message
-            .map(|m| m.content)
-            .unwrap_or_default();
+        let text = response.message.map(|m| m.content).unwrap_or_default();
 
         if text.trim().is_empty() {
             anyhow::bail!("Empty response from Ollama");
@@ -285,11 +299,20 @@ impl OllamaClient {
         let body = ChatRequest {
             model,
             messages: vec![
-                ChatMessage { role: "system", content: system },
-                ChatMessage { role: "user", content: user_message },
+                ChatMessage {
+                    role: "system",
+                    content: system,
+                },
+                ChatMessage {
+                    role: "user",
+                    content: user_message,
+                },
             ],
             stream: true,
-            options: ChatOptions { temperature, num_predict: max_tokens },
+            options: ChatOptions {
+                temperature,
+                num_predict: max_tokens,
+            },
         };
 
         let resp = self
@@ -303,7 +326,11 @@ impl OllamaClient {
         if !resp.status().is_success() {
             let status = resp.status();
             let body_text = resp.text().await.unwrap_or_default();
-            anyhow::bail!("Ollama streaming error ({}): {}", status.as_u16(), body_text);
+            anyhow::bail!(
+                "Ollama streaming error ({}): {}",
+                status.as_u16(),
+                body_text
+            );
         }
 
         tokio::spawn(async move {
@@ -328,10 +355,8 @@ impl OllamaClient {
 
                     if let Ok(resp) = serde_json::from_str::<StreamResponse>(&line) {
                         if let Some(msg) = resp.message {
-                            if !msg.content.is_empty() {
-                                if tx.send(msg.content).await.is_err() {
-                                    return;
-                                }
+                            if !msg.content.is_empty() && tx.send(msg.content).await.is_err() {
+                                return;
                             }
                         }
                         if resp.done {
@@ -380,9 +405,15 @@ mod tests {
 
     #[test]
     fn test_retryable_errors() {
-        assert!(OllamaClient::is_retryable(&anyhow::anyhow!("connection refused")));
-        assert!(OllamaClient::is_retryable(&anyhow::anyhow!("request timeout")));
-        assert!(!OllamaClient::is_retryable(&anyhow::anyhow!("model not found")));
+        assert!(OllamaClient::is_retryable(&anyhow::anyhow!(
+            "connection refused"
+        )));
+        assert!(OllamaClient::is_retryable(&anyhow::anyhow!(
+            "request timeout"
+        )));
+        assert!(!OllamaClient::is_retryable(&anyhow::anyhow!(
+            "model not found"
+        )));
     }
 
     #[test]

@@ -69,7 +69,9 @@ use laminae_ollama::OllamaClient;
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "type")]
 pub enum ShadowEvent {
-    Started { session_id: String },
+    Started {
+        session_id: String,
+    },
     Finding {
         session_id: String,
         finding: report::VulnFinding,
@@ -181,9 +183,11 @@ impl ShadowEngine {
 
         tokio::spawn(async move {
             let start = Instant::now();
-            let _ = tx.send(ShadowEvent::Started {
-                session_id: session_id.clone(),
-            }).await;
+            let _ = tx
+                .send(ShadowEvent::Started {
+                    session_id: session_id.clone(),
+                })
+                .await;
 
             let code_blocks = extractor.extract(&ego_output);
             let mut all_findings = Vec::new();
@@ -197,46 +201,55 @@ impl ShadowEngine {
                     Ok(findings) => {
                         static_run = true;
                         for f in &findings {
-                            let _ = tx.send(ShadowEvent::Finding {
-                                session_id: session_id.clone(),
-                                finding: f.clone(),
-                            }).await;
+                            let _ = tx
+                                .send(ShadowEvent::Finding {
+                                    session_id: session_id.clone(),
+                                    finding: f.clone(),
+                                })
+                                .await;
                         }
                         all_findings.extend(findings);
                     }
                     Err(e) => {
                         tracing::warn!("Shadow static analyzer error: {e}");
-                        let _ = tx.send(ShadowEvent::AnalyzerError {
-                            session_id: session_id.clone(),
-                            analyzer: static_analyzer.name().to_string(),
-                            error: e.to_string(),
-                        }).await;
+                        let _ = tx
+                            .send(ShadowEvent::AnalyzerError {
+                                session_id: session_id.clone(),
+                                analyzer: static_analyzer.name().to_string(),
+                                error: e.to_string(),
+                            })
+                            .await;
                     }
                 }
             }
 
             // Stage 2: LLM adversarial review
-            if config.aggressiveness >= 2 && config.llm_review_enabled {
-                if llm_reviewer.is_available().await {
-                    match llm_reviewer.analyze(&ego_output, &code_blocks).await {
-                        Ok(findings) => {
-                            llm_run = true;
-                            for f in &findings {
-                                let _ = tx.send(ShadowEvent::Finding {
+            if config.aggressiveness >= 2
+                && config.llm_review_enabled
+                && llm_reviewer.is_available().await
+            {
+                match llm_reviewer.analyze(&ego_output, &code_blocks).await {
+                    Ok(findings) => {
+                        llm_run = true;
+                        for f in &findings {
+                            let _ = tx
+                                .send(ShadowEvent::Finding {
                                     session_id: session_id.clone(),
                                     finding: f.clone(),
-                                }).await;
-                            }
-                            all_findings.extend(findings);
+                                })
+                                .await;
                         }
-                        Err(e) => {
-                            tracing::warn!("Shadow LLM reviewer error: {e}");
-                            let _ = tx.send(ShadowEvent::AnalyzerError {
+                        all_findings.extend(findings);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Shadow LLM reviewer error: {e}");
+                        let _ = tx
+                            .send(ShadowEvent::AnalyzerError {
                                 session_id: session_id.clone(),
                                 analyzer: llm_reviewer.name().to_string(),
                                 error: e.to_string(),
-                            }).await;
-                        }
+                            })
+                            .await;
                     }
                 }
             }
@@ -246,34 +259,42 @@ impl ShadowEngine {
                 .iter()
                 .any(|b| b.content.len() >= config.sandbox_min_code_len);
 
-            if config.aggressiveness >= 3 && config.sandbox_enabled && has_substantial_code {
-                if sandbox.is_available().await {
-                    match sandbox.analyze(&ego_output, &code_blocks).await {
-                        Ok(findings) => {
-                            sandbox_run = true;
-                            for f in &findings {
-                                let _ = tx.send(ShadowEvent::Finding {
+            if config.aggressiveness >= 3
+                && config.sandbox_enabled
+                && has_substantial_code
+                && sandbox.is_available().await
+            {
+                match sandbox.analyze(&ego_output, &code_blocks).await {
+                    Ok(findings) => {
+                        sandbox_run = true;
+                        for f in &findings {
+                            let _ = tx
+                                .send(ShadowEvent::Finding {
                                     session_id: session_id.clone(),
                                     finding: f.clone(),
-                                }).await;
-                            }
-                            all_findings.extend(findings);
+                                })
+                                .await;
                         }
-                        Err(e) => {
-                            tracing::warn!("Shadow sandbox error: {e}");
-                            let _ = tx.send(ShadowEvent::AnalyzerError {
+                        all_findings.extend(findings);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Shadow sandbox error: {e}");
+                        let _ = tx
+                            .send(ShadowEvent::AnalyzerError {
                                 session_id: session_id.clone(),
                                 analyzer: sandbox.name().to_string(),
                                 error: e.to_string(),
-                            }).await;
-                        }
+                            })
+                            .await;
                     }
                 }
             }
 
             // Deduplicate
             all_findings.sort_by(|a, b| {
-                a.category.to_string().cmp(&b.category.to_string())
+                a.category
+                    .to_string()
+                    .cmp(&b.category.to_string())
                     .then(a.evidence.cmp(&b.evidence))
             });
             all_findings.dedup_by(|a, b| a.category == b.category && a.evidence == b.evidence);
@@ -335,7 +356,10 @@ mod tests {
         let store = create_report_store();
         let engine = ShadowEngine::with_config(
             store,
-            ShadowConfig { enabled: false, ..Default::default() },
+            ShadowConfig {
+                enabled: false,
+                ..Default::default()
+            },
             OllamaClient::new(),
         );
         let mut rx = engine.analyze_async("test".into(), "hello".into());
@@ -378,10 +402,7 @@ mod tests {
         };
         let engine = ShadowEngine::with_config(store.clone(), config, OllamaClient::new());
 
-        let mut rx = engine.analyze_async(
-            "vuln".into(),
-            "```js\neval(userInput);\n```".into(),
-        );
+        let mut rx = engine.analyze_async("vuln".into(), "```js\neval(userInput);\n```".into());
 
         let mut found = false;
         while let Some(event) = rx.recv().await {

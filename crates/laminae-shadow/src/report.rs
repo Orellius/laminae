@@ -138,7 +138,10 @@ pub fn build_summary(
         .into_iter()
         .flatten()
         .collect();
-        return format!("Clean — no vulnerabilities found (ran: {})", stages.join(", "));
+        return format!(
+            "Clean — no vulnerabilities found (ran: {})",
+            stages.join(", ")
+        );
     }
 
     let by_severity = |sev: VulnSeverity| findings.iter().filter(|f| f.severity == sev).count();
@@ -149,11 +152,21 @@ pub fn build_summary(
     let info = by_severity(VulnSeverity::Info);
 
     let mut parts = Vec::new();
-    if critical > 0 { parts.push(format!("{critical} critical")); }
-    if high > 0 { parts.push(format!("{high} high")); }
-    if medium > 0 { parts.push(format!("{medium} medium")); }
-    if low > 0 { parts.push(format!("{low} low")); }
-    if info > 0 { parts.push(format!("{info} info")); }
+    if critical > 0 {
+        parts.push(format!("{critical} critical"));
+    }
+    if high > 0 {
+        parts.push(format!("{high} high"));
+    }
+    if medium > 0 {
+        parts.push(format!("{medium} medium"));
+    }
+    if low > 0 {
+        parts.push(format!("{low} low"));
+    }
+    if info > 0 {
+        parts.push(format!("{info} info"));
+    }
 
     format!("Found {} issue(s): {}", findings.len(), parts.join(", "))
 }
@@ -187,15 +200,18 @@ mod tests {
 
     #[test]
     fn test_build_summary_with_findings() {
-        let findings = vec![
-            VulnFinding {
-                id: "1".into(), category: VulnCategory::SqlInjection,
-                severity: VulnSeverity::Critical, title: "SQLi".into(),
-                description: "t".into(), evidence: "t".into(),
-                line: None, cwe: Some(89), remediation: "fix".into(),
-                source: AnalysisSource::Static,
-            },
-        ];
+        let findings = vec![VulnFinding {
+            id: "1".into(),
+            category: VulnCategory::SqlInjection,
+            severity: VulnSeverity::Critical,
+            title: "SQLi".into(),
+            description: "t".into(),
+            evidence: "t".into(),
+            line: None,
+            cwe: Some(89),
+            remediation: "fix".into(),
+            source: AnalysisSource::Static,
+        }];
         let summary = build_summary(&findings, true, false, false);
         assert!(summary.contains("1 issue(s)"));
         assert!(summary.contains("1 critical"));

@@ -14,10 +14,10 @@
 //! to direct Ego calls and Shadow skips LLM review.
 
 use laminae::glassbox::{Glassbox, GlassboxConfig};
-use laminae::psyche::{EgoBackend, PsycheConfig, PsycheEngine};
-use laminae::shadow::{ShadowEngine, ShadowEvent, create_report_store};
-use laminae::shadow::config::ShadowConfig;
 use laminae::ollama::OllamaClient;
+use laminae::psyche::{EgoBackend, PsycheConfig, PsycheEngine};
+use laminae::shadow::config::ShadowConfig;
+use laminae::shadow::{create_report_store, ShadowEngine, ShadowEvent};
 
 /// A mock Ego that returns canned responses based on input keywords.
 /// Replace this with your actual LLM client.
@@ -78,7 +78,7 @@ async fn main() -> anyhow::Result<()> {
     let glassbox = Glassbox::new(
         GlassboxConfig::default()
             .with_immutable_zone("/etc")
-            .with_immutable_zone("/usr")
+            .with_immutable_zone("/usr"),
     );
 
     // Layer 2: Psyche (personality)
@@ -144,10 +144,8 @@ async fn main() -> anyhow::Result<()> {
 
         // Step 4: Shadow async red-team (non-blocking)
         println!("  [Shadow] Starting async security audit...");
-        let mut shadow_rx = shadow.analyze_async(
-            format!("msg-{}", user_input.len()),
-            ego_response.clone(),
-        );
+        let mut shadow_rx =
+            shadow.analyze_async(format!("msg-{}", user_input.len()), ego_response.clone());
 
         // Show the response to the user immediately
         println!("\n  Assistant: {ego_response}\n");
@@ -188,7 +186,10 @@ async fn main() -> anyhow::Result<()> {
     for report in reports.iter() {
         println!(
             "  - {} | clean={} | issues={} | {}ms",
-            report.session_id, report.clean, report.findings.len(), report.analysis_duration_ms
+            report.session_id,
+            report.clean,
+            report.findings.len(),
+            report.analysis_duration_ms
         );
     }
 

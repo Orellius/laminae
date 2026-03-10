@@ -40,7 +40,8 @@ RULES:
 /// Build the user-facing prompt for the Shadow LLM.
 pub fn build_shadow_prompt(ego_output: &str, code_blocks_summary: &str) -> String {
     let mut prompt = String::with_capacity(ego_output.len() + code_blocks_summary.len() + 200);
-    prompt.push_str("Analyze the following AI-generated response for security vulnerabilities:\n\n");
+    prompt
+        .push_str("Analyze the following AI-generated response for security vulnerabilities:\n\n");
     prompt.push_str("=== FULL RESPONSE ===\n");
     prompt.push_str(ego_output);
     prompt.push_str("\n\n");
@@ -93,13 +94,11 @@ mod tests {
 
     #[test]
     fn test_format_code_blocks() {
-        let blocks = vec![
-            ExtractedBlock {
-                language: Some("python".into()),
-                content: "x = 1".into(),
-                char_offset: 0,
-            },
-        ];
+        let blocks = vec![ExtractedBlock {
+            language: Some("python".into()),
+            content: "x = 1".into(),
+            char_offset: 0,
+        }];
         let formatted = format_code_blocks(&blocks);
         assert!(formatted.contains("Block 1 (python)"));
         assert!(formatted.contains("x = 1"));

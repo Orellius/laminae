@@ -9,9 +9,9 @@
 //! This example uses only static analysis (aggressiveness=1), which
 //! requires no Ollama. Set aggressiveness=2 for LLM review.
 
-use laminae::shadow::{ShadowEngine, ShadowEvent, create_report_store};
-use laminae::shadow::config::ShadowConfig;
 use laminae::ollama::OllamaClient;
+use laminae::shadow::config::ShadowConfig;
+use laminae::shadow::{create_report_store, ShadowEngine, ShadowEvent};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -91,11 +91,15 @@ app.get('/search', (req, res) => {
                 println!("  Issues found: {}", report.findings.len());
                 println!("  Max severity: {}", report.max_severity);
                 println!("  Analysis time: {}ms", report.analysis_duration_ms);
-                println!("  Stages: static={}, llm={}, sandbox={}",
-                    report.static_run, report.llm_run, report.sandbox_run);
+                println!(
+                    "  Stages: static={}, llm={}, sandbox={}",
+                    report.static_run, report.llm_run, report.sandbox_run
+                );
                 println!("  Summary: {}\n", report.summary);
             }
-            ShadowEvent::AnalyzerError { analyzer, error, .. } => {
+            ShadowEvent::AnalyzerError {
+                analyzer, error, ..
+            } => {
                 eprintln!("  Analyzer error ({analyzer}): {error}");
             }
         }
@@ -137,7 +141,10 @@ fn add(a: i32, b: i32) -> i32 {
     for report in reports.iter() {
         println!(
             "  - {} | clean={} | issues={} | {}ms",
-            report.session_id, report.clean, report.findings.len(), report.analysis_duration_ms
+            report.session_id,
+            report.clean,
+            report.findings.len(),
+            report.analysis_duration_ms
         );
     }
 
