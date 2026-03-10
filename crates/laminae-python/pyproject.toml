@@ -1,0 +1,26 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "laminae"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+description = "The missing layer between raw LLMs and production AI — Python bindings"
+license = { text = "Apache-2.0" }
+keywords = ["ai", "llm", "safety", "guardrails", "voice-filter"]
+
+[project.urls]
+Homepage = "https://github.com/orellius/laminae"
+Documentation = "https://laminae.ai"
+Repository = "https://github.com/orellius/laminae"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]

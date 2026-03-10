@@ -1,0 +1,18 @@
+[package]
+name = "laminae-python"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Python bindings for Laminae — voice filter, edit tracking, I/O validation via PyO3"
+
+[lib]
+name = "laminae"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module"] }
+laminae-glassbox = { workspace = true }
+laminae-persona = { workspace = true }
+laminae-cortex = { workspace = true }
+chrono = { workspace = true }

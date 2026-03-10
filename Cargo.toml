@@ -11,6 +11,7 @@ members = [
     "crates/laminae-cortex",
     "crates/laminae-anthropic",
     "crates/laminae-openai",
+    "crates/laminae-python",
 ]
 
 [workspace.package]
