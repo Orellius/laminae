@@ -1,0 +1,16 @@
+[package]
+name = "laminae-psyche"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Multi-agent cognitive pipeline for AI — Id (creative), Superego (safety), Ego (executor)"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+dirs = { workspace = true }
+laminae-ollama = { workspace = true }

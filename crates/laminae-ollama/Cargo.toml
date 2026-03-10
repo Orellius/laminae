@@ -1,0 +1,16 @@
+[package]
+name = "laminae-ollama"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Ollama client for local LLM inference — used by Laminae Psyche and Shadow"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+futures-util = { workspace = true }

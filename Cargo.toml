@@ -1,0 +1,48 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/laminae",
+    "crates/laminae-psyche",
+    "crates/laminae-shadow",
+    "crates/laminae-ironclad",
+    "crates/laminae-glassbox",
+    "crates/laminae-ollama",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/orellius/laminae"
+description = "The missing layer between raw LLMs and production AI"
+keywords = ["ai", "llm", "safety", "personality", "guardrails"]
+categories = ["api-bindings", "development-tools"]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# HTTP
+reqwest = { version = "0.12", features = ["json", "stream"] }
+# Error handling
+thiserror = "2"
+anyhow = "1"
+# Logging
+tracing = "0.1"
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+# Regex
+regex = "1"
+# Async utilities
+futures-util = "0.3"
+# System
+dirs = "6"
+libc = "0.2"
+# Internal crates
+laminae-psyche = { path = "crates/laminae-psyche" }
+laminae-shadow = { path = "crates/laminae-shadow" }
+laminae-ironclad = { path = "crates/laminae-ironclad" }
+laminae-glassbox = { path = "crates/laminae-glassbox" }
+laminae-ollama = { path = "crates/laminae-ollama" }

@@ -1,0 +1,18 @@
+[package]
+name = "laminae-shadow"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Adversarial red-teaming engine for AI output — static analysis, LLM review, sandbox execution"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+regex = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+dirs = { workspace = true }
+laminae-ollama = { workspace = true }

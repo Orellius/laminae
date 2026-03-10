@@ -1,0 +1,16 @@
+[package]
+name = "laminae"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The missing layer between raw LLMs and production AI — personality, safety, sandboxing, containment"
+keywords = ["ai", "llm", "safety", "personality", "guardrails"]
+categories = ["api-bindings", "development-tools"]
+
+[dependencies]
+laminae-psyche = { workspace = true }
+laminae-shadow = { workspace = true }
+laminae-ironclad = { workspace = true }
+laminae-glassbox = { workspace = true }
+laminae-ollama = { workspace = true }

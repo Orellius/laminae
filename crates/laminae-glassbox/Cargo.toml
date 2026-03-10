@@ -1,0 +1,13 @@
+[package]
+name = "laminae-glassbox"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Input/output containment layer for AI agents — rate limiting, command blocklists, immutable zones"
+
+[dependencies]
+thiserror = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+dirs = { workspace = true }
