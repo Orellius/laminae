@@ -269,7 +269,10 @@ fn analyze_output(output: &str, lang: &str, findings: &mut Vec<VulnFinding>) {
     // File system access attempts outside allowed paths
     let fs_patterns = [
         ("permission denied", "File access denied by sandbox"),
-        ("read-only file system", "Write blocked by read-only filesystem"),
+        (
+            "read-only file system",
+            "Write blocked by read-only filesystem",
+        ),
         ("/etc/passwd", "Attempted to read system files"),
         ("/etc/shadow", "Attempted to read shadow passwords"),
     ];
@@ -328,7 +331,10 @@ fn extract_matching_line(output: &str, pattern: &str) -> String {
     // Fallback: check against lowered output for position
     if let Some(pos) = lower.find(&pattern_lower) {
         let start = output[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let end = output[pos..].find('\n').map(|i| pos + i).unwrap_or(output.len());
+        let end = output[pos..]
+            .find('\n')
+            .map(|i| pos + i)
+            .unwrap_or(output.len());
         return truncate(&output[start..end], 150);
     }
     truncate(output, 150)

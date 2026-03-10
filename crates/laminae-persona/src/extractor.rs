@@ -232,7 +232,10 @@ fn compute_extraction_quality(samples: &[&WeightedSample]) -> ExtractionQuality 
         .iter()
         .map(|s| s.text.split_whitespace().count())
         .collect();
-    let short_samples = word_counts.iter().filter(|&&c| c < MIN_SAMPLE_WORDS).count();
+    let short_samples = word_counts
+        .iter()
+        .filter(|&&c| c < MIN_SAMPLE_WORDS)
+        .count();
     let avg_sample_length = if word_counts.is_empty() {
         0.0
     } else {
@@ -288,8 +291,8 @@ fn compute_extraction_quality(samples: &[&WeightedSample]) -> ExtractionQuality 
     // Overall confidence: weighted combination of factors
     let count_factor = (samples.len() as f64 / RECOMMENDED_SAMPLES as f64).min(1.0);
     let useful_ratio = 1.0 - (short_samples as f64 / samples.len().max(1) as f64);
-    let confidence = (count_factor * 0.3 + diversity_score * 0.4 + useful_ratio * 0.3)
-        .clamp(0.0, 1.0);
+    let confidence =
+        (count_factor * 0.3 + diversity_score * 0.4 + useful_ratio * 0.3).clamp(0.0, 1.0);
 
     ExtractionQuality {
         confidence,
@@ -540,7 +543,8 @@ mod tests {
     #[test]
     fn test_quality_high_confidence() {
         let samples: Vec<WeightedSample> = vec![
-            "Rust is the best systems language. Performance meets safety. No GC pauses ever.".into(),
+            "Rust is the best systems language. Performance meets safety. No GC pauses ever."
+                .into(),
             "Ship it first, optimize later. The compiler catches what tests miss.".into(),
             "Every abstraction has a cost. Make sure you're paying for something real.".into(),
             "Nobody reads your README. Write code that documents itself through types.".into(),
@@ -550,8 +554,16 @@ mod tests {
         let refs: Vec<&WeightedSample> = samples.iter().collect();
         let quality = compute_extraction_quality(&refs);
 
-        assert!(quality.confidence > 0.6, "confidence={}", quality.confidence);
-        assert!(quality.diversity_score > 0.4, "diversity={}", quality.diversity_score);
+        assert!(
+            quality.confidence > 0.6,
+            "confidence={}",
+            quality.confidence
+        );
+        assert!(
+            quality.diversity_score > 0.4,
+            "diversity={}",
+            quality.diversity_score
+        );
         assert_eq!(quality.short_samples, 0);
         assert!(quality.warnings.is_empty() || quality.warnings.len() <= 1);
     }
@@ -567,7 +579,11 @@ mod tests {
         let refs: Vec<&WeightedSample> = samples.iter().collect();
         let quality = compute_extraction_quality(&refs);
 
-        assert!(quality.diversity_score < 0.5, "diversity={}", quality.diversity_score);
+        assert!(
+            quality.diversity_score < 0.5,
+            "diversity={}",
+            quality.diversity_score
+        );
     }
 
     #[test]
