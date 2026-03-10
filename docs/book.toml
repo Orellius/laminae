@@ -1,0 +1,12 @@
+[book]
+title = "Laminae Documentation"
+authors = ["Orel Ohayon"]
+description = "The missing layer between raw LLMs and production AI"
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/orellius/laminae"
+edit-url-template = "https://github.com/orellius/laminae/edit/main/docs/{path}"
