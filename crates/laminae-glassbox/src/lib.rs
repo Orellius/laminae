@@ -1,8 +1,8 @@
-//! # laminae-glassbox — Input/Output Containment Layer
+//! # laminae-glassbox -- Input/Output Containment Layer
 //!
 //! Rust-enforced containment that no LLM can reason its way out of.
 //! The Glassbox validates inputs, outputs, commands, and file writes
-//! against configurable rules — rate limits, blocklists, and immutable zones.
+//! against configurable rules -- rate limits, blocklists, and immutable zones.
 //!
 //! ## Design Philosophy
 //!
@@ -35,9 +35,11 @@ use std::sync::Mutex;
 use std::time::Instant;
 
 use thiserror::Error;
+use unicode_normalization::UnicodeNormalization;
 
 // ── Error Types ──
 
+#[must_use]
 #[derive(Error, Debug)]
 pub enum GlassboxViolation {
     #[error("GLASSBOX BLOCK [{category}]: {reason}")]
@@ -238,7 +240,7 @@ impl Default for RateLimitConfig {
     }
 }
 
-/// Full Glassbox configuration — all rules are user-defined.
+/// Full Glassbox configuration -- all rules are user-defined.
 #[derive(Debug, Clone)]
 pub struct GlassboxConfig {
     /// Paths that can never be written to.
@@ -302,7 +304,7 @@ impl GlassboxConfig {
 
 // ── Core Glassbox ──
 
-/// The Glassbox — a Rust-enforced containment layer.
+/// The Glassbox -- a Rust-enforced containment layer.
 ///
 /// The LLM cannot modify, bypass, or reason its way out of these checks.
 /// All validation is deterministic and runs in constant time relative to
@@ -333,8 +335,10 @@ impl Glassbox {
     }
 
     /// Validate user input before it reaches the AI.
+    #[must_use = "validation result must be checked"]
     pub fn validate_input(&self, text: &str) -> Result<(), GlassboxViolation> {
-        let lower = text.to_lowercase();
+        let normalized: String = text.nfkc().collect();
+        let lower = normalized.to_lowercase();
         for pattern in &self.config.input_injection_patterns {
             if lower.contains(pattern) {
                 self.emit(
@@ -352,8 +356,10 @@ impl Glassbox {
     }
 
     /// Validate LLM output before it reaches the user.
+    #[must_use = "validation result must be checked"]
     pub fn validate_output(&self, text: &str) -> Result<(), GlassboxViolation> {
-        let lower = text.to_lowercase();
+        let normalized: String = text.nfkc().collect();
+        let lower = normalized.to_lowercase();
         for pattern in &self.config.output_violation_patterns {
             if lower.contains(pattern) {
                 self.emit(
@@ -371,8 +377,10 @@ impl Glassbox {
     }
 
     /// Validate a shell command before execution.
+    #[must_use = "validation result must be checked"]
     pub fn validate_command(&self, command: &str) -> Result<(), GlassboxViolation> {
-        let lower = command.to_lowercase();
+        let normalized: String = command.nfkc().collect();
+        let lower = normalized.to_lowercase();
         for pattern in &self.config.dangerous_command_patterns {
             if lower.contains(pattern) {
                 self.emit(
@@ -385,16 +393,17 @@ impl Glassbox {
                 );
                 return Err(GlassboxViolation::Blocked {
                     category: "dangerous_command".to_string(),
-                    reason: format!("Command blocked — matches dangerous pattern: {pattern}"),
+                    reason: format!("Command blocked - matches dangerous pattern: {pattern}"),
                 });
             }
         }
         Ok(())
     }
 
-    /// Validate a file path for write access — blocks immutable zones.
+    /// Validate a file path for write access -- blocks immutable zones.
     ///
     /// Canonicalizes the path first to prevent symlink bypass attacks.
+    #[must_use = "validation result must be checked"]
     pub fn validate_write_path(&self, path: &str) -> Result<(), GlassboxViolation> {
         let canonical = std::path::Path::new(path)
             .canonicalize()
@@ -422,6 +431,7 @@ impl Glassbox {
     }
 
     /// Check rate limits for a tool call.
+    #[must_use = "rate limit result must be checked"]
     pub fn check_rate_limit(&self, tool: &str) -> Result<(), GlassboxViolation> {
         self.rate_limiter.check(tool, &self.config.rate_limits)
     }
@@ -480,6 +490,9 @@ impl RateLimiter {
                 shell_recent += timestamps.len();
             }
         }
+
+        // Prune tools with no recent timestamps to free memory.
+        calls.retain(|_, timestamps| !timestamps.is_empty());
 
         if let Some(timestamps) = calls.get(tool) {
             if timestamps.len() >= config.per_tool_per_minute {

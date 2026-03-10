@@ -11,6 +11,7 @@ description = "Input/output containment layer for AI agents — rate limiting, c
 thiserror = { workspace = true }
 chrono = { workspace = true }
 tracing = { workspace = true }
+unicode-normalization = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

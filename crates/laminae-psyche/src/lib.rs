@@ -56,6 +56,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::sync::mpsc;
 
 use laminae_ollama::OllamaClient;
@@ -63,6 +64,28 @@ use prompts::{
     classify_tier, ego_context, ego_context_cop, id_prompt, id_prompt_cop, should_skip_psyche,
     superego_prompt, superego_prompt_cop, ResponseTier,
 };
+
+// ── Typed Errors ──
+
+/// Typed errors for the Psyche engine.
+#[derive(Debug, Error)]
+pub enum PsycheError {
+    /// An LLM backend (Ollama or Ego) returned an error.
+    #[error("backend error: {0}")]
+    BackendError(#[from] anyhow::Error),
+
+    /// Configuration is invalid or missing required values.
+    #[error("config error: {0}")]
+    ConfigError(String),
+
+    /// Superego blocked the request for safety reasons.
+    #[error("blocked: {0}")]
+    Blocked(String),
+
+    /// An operation timed out waiting for a response.
+    #[error("timeout")]
+    Timeout,
+}
 
 // ── Traits — Bring Your Own Backend ──
 
@@ -251,6 +274,30 @@ impl PsycheConfig {
             }
             Err(_) => Self::default(),
         }
+    }
+
+    /// Set the Id agent model name.
+    pub fn with_id_model(mut self, model: impl Into<String>) -> Self {
+        self.id_model = model.into();
+        self
+    }
+
+    /// Set the Superego agent model name.
+    pub fn with_superego_model(mut self, model: impl Into<String>) -> Self {
+        self.superego_model = model.into();
+        self
+    }
+
+    /// Set the Id agent temperature (clamped to 0.0 - 2.0).
+    pub fn with_id_temperature(mut self, temperature: f32) -> Self {
+        self.id_temperature = temperature.clamp(0.0, 2.0);
+        self
+    }
+
+    /// Set the Ego system prompt.
+    pub fn with_ego_system_prompt(mut self, prompt: impl Into<String>) -> Self {
+        self.ego_system_prompt = prompt.into();
+        self
     }
 
     /// Generate a human-readable weight instruction for the Ego.

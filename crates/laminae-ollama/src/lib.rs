@@ -36,7 +36,34 @@
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::sync::mpsc;
+
+// ── Typed Errors ──
+
+/// Typed errors for the Ollama client.
+#[derive(Debug, Error)]
+pub enum OllamaError {
+    /// Failed to connect to the Ollama server.
+    #[error("connection failed: {0}")]
+    ConnectionFailed(String),
+
+    /// Request timed out waiting for a response.
+    #[error("request timed out")]
+    Timeout,
+
+    /// The server returned a response that could not be parsed.
+    #[error("invalid response: {0}")]
+    InvalidResponse(String),
+
+    /// The requested model is not available locally.
+    #[error("model not found: {0}")]
+    ModelNotFound(String),
+
+    /// The Ollama server returned an HTTP error status.
+    #[error("server error (HTTP {0})")]
+    ServerError(u16),
+}
 
 /// Default Ollama API endpoint.
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11434";

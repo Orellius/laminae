@@ -64,10 +64,45 @@ use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
 use laminae_psyche::EgoBackend;
+
+// ── Typed Errors ──
+
+/// Typed errors for the OpenAI-compatible backend.
+#[derive(Debug, Error)]
+pub enum OpenAIError {
+    /// Failed to connect to the API server.
+    #[error("connection failed: {0}")]
+    ConnectionFailed(String),
+
+    /// Request timed out.
+    #[error("request timed out")]
+    Timeout,
+
+    /// The API returned a response that could not be parsed.
+    #[error("invalid response: {0}")]
+    InvalidResponse(String),
+
+    /// Authentication failed (invalid or missing API key).
+    #[error("authentication failed: {0}")]
+    AuthError(String),
+
+    /// The API returned an HTTP error with a structured message.
+    #[error("API error (HTTP {status}): [{error_type}] {message}")]
+    ApiError {
+        status: u16,
+        error_type: String,
+        message: String,
+    },
+
+    /// Rate limit exceeded.
+    #[error("rate limited: retry after {retry_after_secs}s")]
+    RateLimited { retry_after_secs: u64 },
+}
 
 // ── Configuration ──
 

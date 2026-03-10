@@ -1,4 +1,4 @@
-//! # laminae-ironclad — Process-Level Execution Sandbox
+//! # laminae-ironclad -- Process-Level Execution Sandbox
 //!
 //! Three hard constraints enforced on ALL spawned sub-processes:
 //!
@@ -43,13 +43,41 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use tokio::process::Command;
 
 use laminae_glassbox::{log_glassbox_event, Severity};
 
 pub mod sandbox;
 pub use sandbox::{default_provider, NetworkPolicy, NoopProvider, SandboxProfile, SandboxProvider};
+
+/// Structured error type for the ironclad public API.
+#[derive(Debug, thiserror::Error)]
+pub enum IroncladError {
+    /// A permanently blocked binary was invoked.
+    #[error("IRONCLAD BLOCK: Binary '{binary}' is permanently blocked.")]
+    BlockedBinary { binary: String },
+
+    /// A binary that is not on the allowlist was invoked.
+    #[error("IRONCLAD BLOCK: Binary '{binary}' is not on the allowlist.")]
+    UnlistedBinary { binary: String },
+
+    /// A blocked binary was found inside a piped/chained command.
+    #[error("IRONCLAD BLOCK: Command contains blocked binary '{binary}' in pipe/chain.")]
+    BlockedInPipe { binary: String },
+
+    /// A dangerous pattern was detected in a command string.
+    #[error("IRONCLAD BLOCK: Command matches dangerous pattern: {pattern}")]
+    DangerousPattern { pattern: String },
+
+    /// Network isolation failed and the policy required it.
+    #[error("IRONCLAD: Network isolation failed but policy requires it: {details}")]
+    NetworkIsolationFailed { details: String },
+
+    /// A sandbox operation failed.
+    #[error("IRONCLAD: Sandbox error: {0}")]
+    Sandbox(String),
+}
 
 #[cfg(target_os = "macos")]
 pub use sandbox::SeatbeltProvider;
@@ -61,7 +89,7 @@ pub use sandbox::LinuxSandboxProvider;
 pub use sandbox::WindowsSandboxProvider;
 
 // ══════════════════════════════════════════════════════════
-// 1. COMMAND WHITELIST — Execution Denial
+// 1. COMMAND WHITELIST -- Execution Denial
 // ══════════════════════════════════════════════════════════
 
 /// Binaries that are NEVER allowed to execute under any circumstances.
@@ -199,17 +227,27 @@ impl Default for IroncladConfig {
                 "PRIVATE_KEY".to_string(),
                 "SECRET_KEY".to_string(),
                 "ENCRYPTION_KEY".to_string(),
+                "GOOGLE_APPLICATION_CREDENTIALS".to_string(),
+                "AZURE_CLIENT_SECRET".to_string(),
+                "NPM_TOKEN".to_string(),
+                "DOCKER_AUTH_CONFIG".to_string(),
+                "KUBECONFIG".to_string(),
+                "FIREBASE_TOKEN".to_string(),
+                "HEROKU_API_KEY".to_string(),
+                "DIGITALOCEAN_ACCESS_TOKEN".to_string(),
             ],
         }
     }
 }
 
 /// Validate that a binary is safe to execute.
+#[must_use = "validation result must be checked before executing the binary"]
 pub fn validate_binary(binary: &str) -> Result<()> {
     validate_binary_with_config(binary, &IroncladConfig::default())
 }
 
 /// Validate with a custom configuration.
+#[must_use = "validation result must be checked before executing the binary"]
 pub fn validate_binary_with_config(binary: &str, config: &IroncladConfig) -> Result<()> {
     let bare = binary.rsplit('/').next().unwrap_or(binary);
 
@@ -221,7 +259,10 @@ pub fn validate_binary_with_config(binary: &str, config: &IroncladConfig) -> Res
             "ironclad_blocked_binary",
             &format!("CRITICAL: Attempted execution of blocked binary: {bare}"),
         );
-        bail!("IRONCLAD BLOCK: Binary '{bare}' is permanently blocked.");
+        return Err(IroncladError::BlockedBinary {
+            binary: bare.to_string(),
+        }
+        .into());
     }
 
     if !config.allowlist.iter().any(|a| a == bare) {
@@ -230,18 +271,23 @@ pub fn validate_binary_with_config(binary: &str, config: &IroncladConfig) -> Res
             "ironclad_unlisted_binary",
             &format!("Blocked unlisted binary: {bare}"),
         );
-        bail!("IRONCLAD BLOCK: Binary '{bare}' is not on the allowlist.");
+        return Err(IroncladError::UnlistedBinary {
+            binary: bare.to_string(),
+        }
+        .into());
     }
 
     Ok(())
 }
 
 /// Validate an entire command string (catches piped commands, subshells, etc.)
+#[must_use = "validation result must be checked before executing the command"]
 pub fn validate_command_deep(command: &str) -> Result<()> {
     validate_command_deep_with_config(command, &IroncladConfig::default())
 }
 
 /// Deep command validation with custom configuration.
+#[must_use = "validation result must be checked before executing the command"]
 pub fn validate_command_deep_with_config(command: &str, config: &IroncladConfig) -> Result<()> {
     let lower = command.to_lowercase();
 
@@ -259,7 +305,10 @@ pub fn validate_command_deep_with_config(command: &str, config: &IroncladConfig)
                     truncate(command, 120)
                 ),
             );
-            bail!("IRONCLAD BLOCK: Command contains blocked binary '{bare}' in pipe/chain.");
+            return Err(IroncladError::BlockedInPipe {
+                binary: bare.to_string(),
+            }
+            .into());
         }
     }
 
@@ -302,7 +351,10 @@ pub fn validate_command_deep_with_config(command: &str, config: &IroncladConfig)
                     truncate(command, 120)
                 ),
             );
-            bail!("IRONCLAD BLOCK: Command matches dangerous pattern: {pattern}");
+            return Err(IroncladError::DangerousPattern {
+                pattern: pattern.to_string(),
+            }
+            .into());
         }
     }
 
@@ -345,7 +397,7 @@ fn extract_all_binaries(command: &str) -> Vec<String> {
 }
 
 // ══════════════════════════════════════════════════════════
-// 2. SANDBOXED COMMAND — Platform-Abstracted
+// 2. SANDBOXED COMMAND -- Platform-Abstracted
 // ══════════════════════════════════════════════════════════
 
 /// Wrap a command in the platform-specific sandbox.
@@ -372,7 +424,7 @@ pub fn sandboxed_command_with_config(
 }
 
 // ══════════════════════════════════════════════════════════
-// 3. RESOURCE WATCHDOG — CPU/Memory Monitor with SIGKILL
+// 3. RESOURCE WATCHDOG -- CPU/Memory Monitor with SIGKILL
 // ══════════════════════════════════════════════════════════
 
 /// Configuration for the resource watchdog.
@@ -436,7 +488,7 @@ impl std::fmt::Display for WatchdogKillReason {
 
 /// Spawn a background watchdog that monitors a child process by PID.
 ///
-/// Returns a cancellation handle — set to `true` to stop monitoring.
+/// Returns a cancellation handle -- set to `true` to stop monitoring.
 /// If thresholds are exceeded, the process tree is SIGKILL'd.
 pub fn spawn_watchdog(pid: u32, config: WatchdogConfig, agent_label: String) -> Arc<AtomicBool> {
     let cancel = Arc::new(AtomicBool::new(false));
@@ -597,9 +649,19 @@ fn kill_process_tree(pid: u32, agent_label: &str, reason: &WatchdogKillReason) {
     );
 
     #[cfg(unix)]
-    unsafe {
-        libc::kill(-(pid as i32), libc::SIGKILL);
-        libc::kill(pid as i32, libc::SIGKILL);
+    {
+        // Guard against overflow: u32::MAX > i32::MAX would wrap to a negative
+        // value and target unintended process groups.
+        if let Ok(signed) = i32::try_from(pid) {
+            // SAFETY: We call kill(2) which is async-signal-safe. The negated
+            // PID targets the entire process group.
+            unsafe {
+                libc::kill(-signed, libc::SIGKILL);
+                libc::kill(signed, libc::SIGKILL);
+            }
+        } else {
+            tracing::error!("[IRONCLAD WATCHDOG] PID {pid} exceeds i32::MAX, cannot send signal");
+        }
     }
 
     #[cfg(windows)]

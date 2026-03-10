@@ -18,6 +18,10 @@
   If you find Laminae useful, consider giving it a ⭐ — it helps others discover the project!
 </p>
 
+<p align="center">
+  <a href="https://docs.orellius.ai/laminae/introduction"><strong>📖 Documentation</strong></a> · <a href="https://github.com/orellius/laminae/blob/main/CHANGELOG.md"><strong>Changelog</strong></a>
+</p>
+
 Laminae (Latin: *layers*) is an open-source modular Rust SDK that adds guardrails, safety, personality, voice, learning, and containment to any AI or LLM application. Each layer works independently or together as a full production-ready stack.
 <p align="center">
 
@@ -311,7 +315,7 @@ cargo bench --workspace
 
 ## Requirements
 
-- **Rust 1.70+**
+- **Rust 1.75+**
 - **Ollama** (for Psyche and Shadow LLM features) — `brew install ollama && ollama serve`
 
 ## Examples

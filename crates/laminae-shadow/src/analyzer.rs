@@ -1,9 +1,13 @@
+use std::sync::LazyLock;
+
+use regex::Regex;
 use thiserror::Error;
 
 use crate::extractor::ExtractedBlock;
 use crate::report::{AnalysisSource, VulnCategory, VulnFinding, VulnSeverity};
 use crate::scanner;
 
+/// Internal error type for individual analyzer stages.
 #[derive(Error, Debug)]
 pub enum AnalyzerError {
     #[error("Static analysis failed: {0}")]
@@ -14,6 +18,34 @@ pub enum AnalyzerError {
     Sandbox(String),
     #[error("Analyzer disabled or unavailable")]
     Disabled,
+}
+
+/// Public error type for the Shadow crate's API surface.
+#[derive(Error, Debug)]
+pub enum ShadowError {
+    #[error("Static analysis failed: {0}")]
+    StaticAnalysis(String),
+    #[error("LLM review failed: {0}")]
+    LlmReview(String),
+    #[error("Sandbox execution failed: {0}")]
+    Sandbox(String),
+    #[error("Configuration error: {0}")]
+    Config(String),
+    #[error("Shadow engine is disabled")]
+    Disabled,
+    #[error("Internal error: {0}")]
+    Internal(String),
+}
+
+impl From<AnalyzerError> for ShadowError {
+    fn from(err: AnalyzerError) -> Self {
+        match err {
+            AnalyzerError::Static(msg) => ShadowError::StaticAnalysis(msg),
+            AnalyzerError::LlmReview(msg) => ShadowError::LlmReview(msg),
+            AnalyzerError::Sandbox(msg) => ShadowError::Sandbox(msg),
+            AnalyzerError::Disabled => ShadowError::Disabled,
+        }
+    }
 }
 
 /// Trait for composable analysis stages.
@@ -52,6 +84,17 @@ struct ShadowRule {
     remediation: &'static str,
 }
 
+/// Pre-compiled version of ShadowRule, built once via LazyLock.
+struct CompiledShadowRule {
+    category: VulnCategory,
+    severity: VulnSeverity,
+    regex: Regex,
+    title: &'static str,
+    description: &'static str,
+    cwe: Option<u32>,
+    remediation: &'static str,
+}
+
 /// Analyzer for dependency-related vulnerabilities in code output.
 ///
 /// Detects known-vulnerable packages, typosquatting patterns, and
@@ -72,6 +115,16 @@ impl Default for DependencyAnalyzer {
 
 struct DepRule {
     pattern: &'static str,
+    title: &'static str,
+    description: &'static str,
+    severity: VulnSeverity,
+    cwe: Option<u32>,
+    remediation: &'static str,
+}
+
+/// Pre-compiled version of DepRule.
+struct CompiledDepRule {
+    regex: Regex,
     title: &'static str,
     description: &'static str,
     severity: VulnSeverity,
@@ -146,29 +199,28 @@ impl Analyzer for DependencyAnalyzer {
         code_blocks: &[ExtractedBlock],
     ) -> Result<Vec<VulnFinding>, AnalyzerError> {
         let mut findings = Vec::new();
+        let compiled = &*COMPILED_DEP_RULES;
 
         let targets: Vec<&str> = std::iter::once(ego_output)
             .chain(code_blocks.iter().map(|b| b.content.as_str()))
             .collect();
 
         for text in &targets {
-            for rule in DEP_RULES {
-                if let Ok(re) = regex::Regex::new(rule.pattern) {
-                    for mat in re.find_iter(text) {
-                        let line_num = text[..mat.start()].matches('\n').count() + 1;
-                        findings.push(VulnFinding {
-                            id: uuid_v4(),
-                            category: VulnCategory::Unknown,
-                            severity: rule.severity,
-                            title: rule.title.to_string(),
-                            description: rule.description.to_string(),
-                            evidence: truncate_evidence(mat.as_str()),
-                            line: Some(line_num),
-                            cwe: rule.cwe,
-                            remediation: rule.remediation.to_string(),
-                            source: AnalysisSource::Static,
-                        });
-                    }
+            for rule in compiled {
+                for mat in rule.regex.find_iter(text) {
+                    let line_num = text[..mat.start()].matches('\n').count() + 1;
+                    findings.push(VulnFinding {
+                        id: generate_finding_id(),
+                        category: VulnCategory::Unknown,
+                        severity: rule.severity,
+                        title: rule.title.to_string(),
+                        description: rule.description.to_string(),
+                        evidence: truncate_evidence(mat.as_str()),
+                        line: Some(line_num),
+                        cwe: rule.cwe,
+                        remediation: rule.remediation.to_string(),
+                        source: AnalysisSource::Static,
+                    });
                 }
             }
         }
@@ -197,6 +249,14 @@ impl Default for SecretsAnalyzer {
 
 struct SecretRule {
     pattern: &'static str,
+    title: &'static str,
+    severity: VulnSeverity,
+    remediation: &'static str,
+}
+
+/// Pre-compiled version of SecretRule.
+struct CompiledSecretRule {
+    regex: Regex,
     title: &'static str,
     severity: VulnSeverity,
     remediation: &'static str,
@@ -266,6 +326,40 @@ const SECRET_RULES: &[SecretRule] = &[
     },
 ];
 
+/// Pre-compiled regexes for DEP_RULES. Built once on first access.
+static COMPILED_DEP_RULES: LazyLock<Vec<CompiledDepRule>> = LazyLock::new(|| {
+    DEP_RULES
+        .iter()
+        .filter_map(|rule| {
+            Regex::new(rule.pattern).ok().map(|regex| CompiledDepRule {
+                regex,
+                title: rule.title,
+                description: rule.description,
+                severity: rule.severity,
+                cwe: rule.cwe,
+                remediation: rule.remediation,
+            })
+        })
+        .collect()
+});
+
+/// Pre-compiled regexes for SECRET_RULES. Built once on first access.
+static COMPILED_SECRET_RULES: LazyLock<Vec<CompiledSecretRule>> = LazyLock::new(|| {
+    SECRET_RULES
+        .iter()
+        .filter_map(|rule| {
+            Regex::new(rule.pattern)
+                .ok()
+                .map(|regex| CompiledSecretRule {
+                    regex,
+                    title: rule.title,
+                    severity: rule.severity,
+                    remediation: rule.remediation,
+                })
+        })
+        .collect()
+});
+
 impl Analyzer for SecretsAnalyzer {
     fn name(&self) -> &'static str {
         "secrets"
@@ -280,31 +374,30 @@ impl Analyzer for SecretsAnalyzer {
         code_blocks: &[ExtractedBlock],
     ) -> Result<Vec<VulnFinding>, AnalyzerError> {
         let mut findings = Vec::new();
+        let compiled = &*COMPILED_SECRET_RULES;
 
         let targets: Vec<&str> = std::iter::once(ego_output)
             .chain(code_blocks.iter().map(|b| b.content.as_str()))
             .collect();
 
         for text in &targets {
-            for rule in SECRET_RULES {
-                if let Ok(re) = regex::Regex::new(rule.pattern) {
-                    for mat in re.find_iter(text) {
-                        let line_num = text[..mat.start()].matches('\n').count() + 1;
-                        // Redact the actual secret in evidence
-                        let evidence = redact_secret(mat.as_str());
-                        findings.push(VulnFinding {
-                            id: uuid_v4(),
-                            category: VulnCategory::HardcodedSecret,
-                            severity: rule.severity,
-                            title: rule.title.to_string(),
-                            description: "Credential or secret found in AI output.".to_string(),
-                            evidence,
-                            line: Some(line_num),
-                            cwe: Some(798),
-                            remediation: rule.remediation.to_string(),
-                            source: AnalysisSource::Static,
-                        });
-                    }
+            for rule in compiled {
+                for mat in rule.regex.find_iter(text) {
+                    let line_num = text[..mat.start()].matches('\n').count() + 1;
+                    // Redact the actual secret in evidence
+                    let evidence = redact_secret(mat.as_str());
+                    findings.push(VulnFinding {
+                        id: generate_finding_id(),
+                        category: VulnCategory::HardcodedSecret,
+                        severity: rule.severity,
+                        title: rule.title.to_string(),
+                        description: "Credential or secret found in AI output.".to_string(),
+                        evidence,
+                        line: Some(line_num),
+                        cwe: Some(798),
+                        remediation: rule.remediation.to_string(),
+                        source: AnalysisSource::Static,
+                    });
                 }
             }
         }
@@ -425,6 +518,26 @@ const SHADOW_RULES: &[ShadowRule] = &[
     },
 ];
 
+/// Pre-compiled regexes for SHADOW_RULES. Built once on first access.
+static COMPILED_SHADOW_RULES: LazyLock<Vec<CompiledShadowRule>> = LazyLock::new(|| {
+    SHADOW_RULES
+        .iter()
+        .filter_map(|rule| {
+            Regex::new(rule.pattern)
+                .ok()
+                .map(|regex| CompiledShadowRule {
+                    category: rule.category,
+                    severity: rule.severity,
+                    regex,
+                    title: rule.title,
+                    description: rule.description,
+                    cwe: rule.cwe,
+                    remediation: rule.remediation,
+                })
+        })
+        .collect()
+});
+
 impl StaticAnalyzer {
     pub fn new() -> Self {
         Self {
@@ -461,7 +574,7 @@ impl Analyzer for StaticAnalyzer {
 
             for sf in scan_findings {
                 findings.push(VulnFinding {
-                    id: uuid_v4(),
+                    id: generate_finding_id(),
                     category: map_scanner_category(&sf.rule_id),
                     severity: map_scanner_severity(sf.severity),
                     title: sf.message.clone(),
@@ -476,6 +589,7 @@ impl Analyzer for StaticAnalyzer {
         }
 
         // Stage 2: Shadow-specific rules on full output + code blocks
+        let compiled = &*COMPILED_SHADOW_RULES;
         let targets: Vec<(&str, &str)> = std::iter::once(("output", ego_output))
             .chain(code_blocks.iter().map(|b| {
                 let lang = b.language.as_deref().unwrap_or("code");
@@ -484,25 +598,23 @@ impl Analyzer for StaticAnalyzer {
             .collect();
 
         for (source_name, text) in &targets {
-            for rule in SHADOW_RULES {
-                if let Ok(re) = regex::Regex::new(rule.pattern) {
-                    for mat in re.find_iter(text) {
-                        let line_num = text[..mat.start()].matches('\n').count() + 1;
-                        let evidence = truncate_evidence(mat.as_str());
+            for rule in compiled {
+                for mat in rule.regex.find_iter(text) {
+                    let line_num = text[..mat.start()].matches('\n').count() + 1;
+                    let evidence = truncate_evidence(mat.as_str());
 
-                        findings.push(VulnFinding {
-                            id: uuid_v4(),
-                            category: rule.category,
-                            severity: rule.severity,
-                            title: rule.title.to_string(),
-                            description: format!("[{}] {}", source_name, rule.description),
-                            evidence,
-                            line: Some(line_num),
-                            cwe: rule.cwe,
-                            remediation: rule.remediation.to_string(),
-                            source: AnalysisSource::Static,
-                        });
-                    }
+                    findings.push(VulnFinding {
+                        id: generate_finding_id(),
+                        category: rule.category,
+                        severity: rule.severity,
+                        title: rule.title.to_string(),
+                        description: format!("[{}] {}", source_name, rule.description),
+                        evidence,
+                        line: Some(line_num),
+                        cwe: rule.cwe,
+                        remediation: rule.remediation.to_string(),
+                        source: AnalysisSource::Static,
+                    });
                 }
             }
         }
@@ -559,7 +671,8 @@ fn truncate_evidence(s: &str) -> String {
     }
 }
 
-fn uuid_v4() -> String {
+/// Generate a unique finding ID using timestamp + atomic counter.
+fn generate_finding_id() -> String {
     use std::sync::atomic::{AtomicU64, Ordering};
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let ts = std::time::SystemTime::now()

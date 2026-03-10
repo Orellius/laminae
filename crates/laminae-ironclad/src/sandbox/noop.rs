@@ -27,7 +27,7 @@ impl SandboxProvider for NoopProvider {
         profile: &SandboxProfile,
     ) -> Result<Command> {
         tracing::warn!(
-            "[IRONCLAD] NoopProvider in use — no OS-level sandbox applied. \
+            "[IRONCLAD] NoopProvider in use -- no OS-level sandbox applied. \
              Binary '{binary}' will run with env scrubbing only."
         );
 

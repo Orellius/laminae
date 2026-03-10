@@ -44,6 +44,19 @@ impl SandboxProvider for SeatbeltProvider {
 fn generate_seatbelt_profile(profile: &SandboxProfile) -> String {
     let project_dir = &profile.project_dir;
 
+    // Build host-specific network rules from the whitelist.
+    // If no hosts are whitelisted, no outbound HTTPS is allowed.
+    let host_rules = build_host_network_rules(&profile.whitelisted_hosts);
+
+    // Only allow DNS to system resolvers (port 53 on loopback and common
+    // system resolver addresses), not to arbitrary remote hosts.
+    let dns_rules = r#";; Allow DNS resolution via system resolvers only
+(allow network-outbound (remote ip "127.0.0.1:53"))
+(allow network-outbound (remote ip "::1:53"))
+(allow network-outbound
+    (remote unix-socket (subpath "/var/run"))
+)"#;
+
     format!(
         r#"(version 1)
 
@@ -74,17 +87,16 @@ fn generate_seatbelt_profile(profile: &SandboxProfile) -> String {
     (subpath (string-append (param "HOME") "/.cache"))
 )
 
-;; NETWORK: Allow ONLY outbound to localhost and whitelisted hosts
+;; NETWORK: Allow ONLY outbound to localhost and unix sockets
 (allow network-outbound
     (remote ip "localhost:*")
     (remote unix-socket)
 )
 
-;; Allow DNS resolution
-(allow network-outbound (remote ip "*:53"))
+{dns_rules}
 
-;; Allow connections to whitelisted APIs (HTTPS)
-(allow network-outbound (remote ip "*:443"))
+;; Allow outbound HTTPS only to explicitly whitelisted hosts
+{host_rules}
 
 ;; BLOCK all inbound network connections (no reverse shells)
 (deny network-inbound)
@@ -98,4 +110,29 @@ fn generate_seatbelt_profile(profile: &SandboxProfile) -> String {
 (allow system-info)
 "#
     )
+}
+
+/// Build Seatbelt network-outbound rules for each whitelisted host.
+///
+/// Seatbelt cannot filter by hostname directly, so we use `remote ip` with
+/// the hostname string. The kernel resolves it at profile load time. For
+/// IP-literal hosts (localhost, 127.0.0.1) we allow all ports; for named
+/// hosts we restrict to port 443 only.
+fn build_host_network_rules(hosts: &[String]) -> String {
+    let mut rules = String::new();
+    for host in hosts {
+        // Skip localhost variants since they are already covered above.
+        if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+            continue;
+        }
+        // Named hosts get HTTPS (port 443) only.
+        rules.push_str(&format!(
+            "(allow network-outbound (remote ip \"{host}:443\"))\n"
+        ));
+    }
+    if rules.is_empty() {
+        ";; No additional hosts whitelisted for outbound HTTPS".to_string()
+    } else {
+        rules
+    }
 }

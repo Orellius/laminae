@@ -56,8 +56,10 @@ use std::time::Instant;
 
 use tokio::sync::{mpsc, RwLock};
 
+pub use analyzer::ShadowError;
+pub use config::ShadowConfig;
+
 use analyzer::{Analyzer, StaticAnalyzer};
-use config::ShadowConfig;
 use extractor::CodeBlockExtractor;
 use llm_reviewer::LlmReviewer;
 use report::{build_summary, VulnReport, VulnSeverity};

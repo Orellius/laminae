@@ -42,7 +42,7 @@ pub enum NetworkPolicy {
 /// A platform-agnostic sandbox profile describing the constraints to apply.
 #[derive(Debug, Clone)]
 pub struct SandboxProfile {
-    /// The project directory — the sandboxed process may write here.
+    /// The project directory -- the sandboxed process may write here.
     pub project_dir: String,
     /// Additional paths the process is allowed to write to.
     pub writable_paths: Vec<String>,
@@ -96,9 +96,9 @@ pub trait SandboxProvider: Send + Sync {
 
 /// Return the best available [`SandboxProvider`] for the current platform.
 ///
-/// * **macOS** — [`SeatbeltProvider`] (`sandbox-exec` / Seatbelt).
-/// * **Linux** — [`LinuxSandboxProvider`] (namespaces, seccomp, rlimits).
-/// * **Other** — [`NoopProvider`] (env scrubbing only, no OS-level sandbox).
+/// * **macOS** -- [`SeatbeltProvider`] (`sandbox-exec` / Seatbelt).
+/// * **Linux** -- [`LinuxSandboxProvider`] (namespaces, seccomp, rlimits).
+/// * **Other** -- [`NoopProvider`] (env scrubbing only, no OS-level sandbox).
 pub fn default_provider() -> Box<dyn SandboxProvider> {
     #[cfg(target_os = "macos")]
     {

@@ -1,9 +1,12 @@
-//! Embedded pattern scanner — line-based vulnerability detection rules.
+//! Embedded pattern scanner -- line-based vulnerability detection rules.
 //!
 //! This is the base scanner that the Shadow's StaticAnalyzer extends with
 //! its own domain-specific rules. It operates on content strings rather
 //! than files, making it suitable for scanning LLM output.
 
+use std::sync::LazyLock;
+
+use regex::Regex;
 use serde::Serialize;
 
 /// Severity level for scan findings.
@@ -33,37 +36,45 @@ struct LineRule {
     message: &'static str,
 }
 
+/// Pre-compiled regex for a line rule, built once at first use.
+struct CompiledLineRule {
+    id: &'static str,
+    severity: Severity,
+    regex: Regex,
+    message: &'static str,
+}
+
 const LINE_RULES: &[LineRule] = &[
     // Code injection
     LineRule {
         id: "dangerous-eval",
         severity: Severity::Critical,
         pattern: r"\beval\s*\(",
-        message: "eval() can execute arbitrary code — high risk of code injection",
+        message: "eval() can execute arbitrary code - high risk of code injection",
     },
     LineRule {
         id: "dangerous-function-constructor",
         severity: Severity::Critical,
         pattern: r"\bnew\s+Function\s*\(",
-        message: "new Function() is equivalent to eval — code injection risk",
+        message: "new Function() is equivalent to eval - code injection risk",
     },
     LineRule {
         id: "dangerous-exec",
         severity: Severity::Critical,
         pattern: r"\bexec\s*\(",
-        message: "exec() spawns system commands — potential remote code execution",
+        message: "exec() spawns system commands - potential remote code execution",
     },
     LineRule {
         id: "dangerous-exec-sync",
         severity: Severity::Critical,
         pattern: r"\bexecSync\s*\(",
-        message: "execSync() spawns system commands synchronously — RCE risk",
+        message: "execSync() spawns system commands synchronously - RCE risk",
     },
     LineRule {
         id: "dangerous-spawn",
         severity: Severity::Warn,
         pattern: r"\bspawn\s*\(",
-        message: "spawn() creates child processes — review command arguments",
+        message: "spawn() creates child processes - review command arguments",
     },
     LineRule {
         id: "dangerous-child-process",
@@ -76,26 +87,26 @@ const LINE_RULES: &[LineRule] = &[
         id: "keychain-access",
         severity: Severity::Critical,
         pattern: r"(keychain|keytar|security-framework|credential.store)",
-        message: "Accesses system credential store — potential secret theft",
+        message: "Accesses system credential store - potential secret theft",
     },
     LineRule {
         id: "ssh-key-access",
         severity: Severity::Critical,
         pattern: r"\.ssh/(id_rsa|id_ed25519|id_ecdsa|authorized_keys)",
-        message: "Accesses SSH keys — potential credential exfiltration",
+        message: "Accesses SSH keys - potential credential exfiltration",
     },
     LineRule {
         id: "password-harvest",
         severity: Severity::Critical,
         pattern: r"(passwords?\.json|credentials?\.json|\.env\.local|\.env\.prod)",
-        message: "References credential/password files — data theft risk",
+        message: "References credential/password files - data theft risk",
     },
     // Network exfiltration
     LineRule {
         id: "webhook-exfil",
         severity: Severity::Critical,
         pattern: r"(webhook|discord\.com/api/webhooks|hooks\.slack\.com)",
-        message: "Sends data to webhooks — potential exfiltration channel",
+        message: "Sends data to webhooks - potential exfiltration channel",
     },
     LineRule {
         id: "dns-exfil",
@@ -108,7 +119,7 @@ const LINE_RULES: &[LineRule] = &[
         id: "recursive-delete",
         severity: Severity::Critical,
         pattern: r"(rm\s+-rf|rimraf|fs\.rm.*recursive|shutil\.rmtree)",
-        message: "Recursive deletion — could destroy data",
+        message: "Recursive deletion - could destroy data",
     },
     LineRule {
         id: "sensitive-path-access",
@@ -121,26 +132,26 @@ const LINE_RULES: &[LineRule] = &[
         id: "base64-decode-exec",
         severity: Severity::Critical,
         pattern: r"(atob|Buffer\.from|base64\.b64decode|base64 -d).*\b(eval|exec|spawn|Function)\b",
-        message: "Decodes base64 then executes — classic obfuscation technique",
+        message: "Decodes base64 then executes - classic obfuscation technique",
     },
     LineRule {
         id: "hex-encoded-strings",
         severity: Severity::Warn,
         pattern: r"\\x[0-9a-fA-F]{2}(\\x[0-9a-fA-F]{2}){5,}",
-        message: "Long hex-encoded string — possible obfuscated payload",
+        message: "Long hex-encoded string - possible obfuscated payload",
     },
     LineRule {
         id: "char-code-obfuscation",
         severity: Severity::Warn,
         pattern: r"String\.fromCharCode\s*\(.*,.*,.*,",
-        message: "String.fromCharCode with many args — possible obfuscation",
+        message: "String.fromCharCode with many args - possible obfuscation",
     },
     // Permission escalation
     LineRule {
         id: "sudo-usage",
         severity: Severity::Critical,
         pattern: r"\bsudo\b",
-        message: "Uses sudo — potential privilege escalation",
+        message: "Uses sudo - potential privilege escalation",
     },
     LineRule {
         id: "chmod-permissive",
@@ -160,20 +171,36 @@ const LINE_RULES: &[LineRule] = &[
         id: "reverse-shell",
         severity: Severity::Critical,
         pattern: r"(\/dev\/tcp|nc\s+-e|ncat\s+-e|bash\s+-i\s+>&|mkfifo.*/tmp/)",
-        message: "Reverse shell pattern detected — backdoor risk",
+        message: "Reverse shell pattern detected - backdoor risk",
     },
     // Data exfiltration
     LineRule {
         id: "curl-post-data",
         severity: Severity::Critical,
         pattern: r"curl\s+.*(-d|--data|--data-binary)\s+.*(@/|@~|\$)",
-        message: "curl POSTing file contents — data exfiltration",
+        message: "curl POSTing file contents - data exfiltration",
     },
 ];
+
+/// Pre-compiled regexes for all LINE_RULES. Built once on first access.
+static COMPILED_LINE_RULES: LazyLock<Vec<CompiledLineRule>> = LazyLock::new(|| {
+    LINE_RULES
+        .iter()
+        .filter_map(|rule| {
+            Regex::new(rule.pattern).ok().map(|regex| CompiledLineRule {
+                id: rule.id,
+                severity: rule.severity,
+                regex,
+                message: rule.message,
+            })
+        })
+        .collect()
+});
 
 /// Scan content and return findings.
 pub fn scan_content(filename: &str, content: &str) -> Vec<ScanFinding> {
     let mut findings = Vec::new();
+    let compiled = &*COMPILED_LINE_RULES;
 
     for (line_num, line) in content.lines().enumerate() {
         let trimmed = line.trim();
@@ -183,18 +210,16 @@ pub fn scan_content(filename: &str, content: &str) -> Vec<ScanFinding> {
             continue;
         }
 
-        for rule in LINE_RULES {
-            if let Ok(re) = regex::Regex::new(rule.pattern) {
-                if re.is_match(line) {
-                    findings.push(ScanFinding {
-                        rule_id: rule.id.to_string(),
-                        severity: rule.severity,
-                        file: filename.to_string(),
-                        line: line_num + 1,
-                        message: rule.message.to_string(),
-                        evidence: truncate_evidence(line),
-                    });
-                }
+        for rule in compiled {
+            if rule.regex.is_match(line) {
+                findings.push(ScanFinding {
+                    rule_id: rule.id.to_string(),
+                    severity: rule.severity,
+                    file: filename.to_string(),
+                    line: line_num + 1,
+                    message: rule.message.to_string(),
+                    evidence: truncate_evidence(line),
+                });
             }
         }
     }

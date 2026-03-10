@@ -13,14 +13,14 @@ use super::{apply_common, NetworkPolicy, SandboxProfile, SandboxProvider};
 ///
 /// Applies the following isolation layers via `pre_exec` hooks (before `execve`):
 ///
-/// 1. **`PR_SET_NO_NEW_PRIVS`** — prevents the child from gaining privileges
+/// 1. **`PR_SET_NO_NEW_PRIVS`** -- prevents the child from gaining privileges
 ///    through setuid/setgid binaries or capabilities.
-/// 2. **Network namespace (`unshare(CLONE_NEWNET)`)** — creates an isolated
+/// 2. **Network namespace (`unshare(CLONE_NEWNET)`)** -- creates an isolated
 ///    network stack when the policy is [`NetworkPolicy::None`]. Requires
 ///    unprivileged user namespaces; skipped if unavailable.
-/// 3. **Resource limits (`setrlimit`)** — caps file size, CPU time, address
+/// 3. **Resource limits (`setrlimit`)** -- caps file size, CPU time, address
 ///    space, and number of open files.
-/// 4. **Environment scrubbing** — removes secret-bearing environment variables.
+/// 4. **Environment scrubbing** -- removes secret-bearing environment variables.
 pub struct LinuxSandboxProvider;
 
 impl SandboxProvider for LinuxSandboxProvider {
@@ -43,7 +43,7 @@ impl SandboxProvider for LinuxSandboxProvider {
         unsafe {
             cmd.pre_exec(move || {
                 apply_prctl()?;
-                apply_network_isolation(&network_policy);
+                apply_network_isolation(&network_policy)?;
                 apply_rlimits();
                 Ok(())
             });
@@ -54,7 +54,7 @@ impl SandboxProvider for LinuxSandboxProvider {
     }
 
     fn is_available(&self) -> bool {
-        // PR_SET_NO_NEW_PRIVS is available on Linux >= 3.5 — effectively all
+        // PR_SET_NO_NEW_PRIVS is available on Linux >= 3.5 -- effectively all
         // modern systems.
         true
     }
@@ -76,28 +76,61 @@ fn apply_prctl() -> std::io::Result<()> {
     Ok(())
 }
 
-/// If the network policy is [`NetworkPolicy::None`], create a new network
-/// namespace so the child has no network interfaces at all.
+/// Apply network isolation based on the requested policy.
 ///
-/// For [`NetworkPolicy::LocalhostOnly`] or [`NetworkPolicy::Restricted`] we
-/// rely on the combination of `PR_SET_NO_NEW_PRIVS` and rlimits — full
-/// network filtering would require eBPF/seccomp-bpf which is out of scope
-/// for the initial implementation.
-fn apply_network_isolation(policy: &NetworkPolicy) {
-    if *policy == NetworkPolicy::None {
-        // CLONE_NEWUSER | CLONE_NEWNET — creating a net namespace requires a
-        // user namespace on unprivileged processes.
-        let flags = libc::CLONE_NEWUSER | libc::CLONE_NEWNET;
-        let ret = unsafe { libc::unshare(flags) };
-        if ret != 0 {
-            // Unprivileged user namespaces may be disabled
-            // (sysctl kernel.unprivileged_userns_clone=0). Fall back silently.
-            tracing::warn!(
-                "[IRONCLAD] unshare(CLONE_NEWUSER|CLONE_NEWNET) failed — \
-                 network namespace isolation unavailable on this system"
-            );
+/// * [`NetworkPolicy::None`] -- creates a new network namespace so the child
+///   has no network interfaces at all. If `unshare` fails, the function
+///   returns an error so the process is never spawned with full network
+///   access (fail-closed).
+/// * [`NetworkPolicy::Restricted`] -- attempts namespace isolation as a
+///   best-effort layer. Full per-host filtering requires eBPF/seccomp-bpf
+///   which is out of scope for the initial implementation. If `unshare`
+///   fails here, a warning is logged but execution continues because
+///   `Restricted` is not a hard isolation guarantee.
+/// * [`NetworkPolicy::LocalhostOnly`] -- same best-effort approach as
+///   `Restricted`.
+fn apply_network_isolation(policy: &NetworkPolicy) -> std::io::Result<()> {
+    match policy {
+        NetworkPolicy::None => {
+            // CLONE_NEWUSER | CLONE_NEWNET -- creating a net namespace
+            // requires a user namespace on unprivileged processes.
+            let flags = libc::CLONE_NEWUSER | libc::CLONE_NEWNET;
+            let ret = unsafe { libc::unshare(flags) };
+            if ret != 0 {
+                // Fail closed: the caller requested zero network access but
+                // the kernel cannot provide it. Returning an error prevents
+                // the child from running with unrestricted networking.
+                let err = std::io::Error::last_os_error();
+                tracing::error!(
+                    "[IRONCLAD] unshare(CLONE_NEWUSER|CLONE_NEWNET) failed \
+                     and NetworkPolicy::None requires it -- aborting spawn: {err}"
+                );
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    format!(
+                        "Network isolation required (NetworkPolicy::None) but \
+                         unshare failed: {err}. The process was NOT spawned to \
+                         prevent running with full network access."
+                    ),
+                ));
+            }
+        }
+        NetworkPolicy::Restricted | NetworkPolicy::LocalhostOnly => {
+            // Best-effort: try namespace isolation but do not abort on
+            // failure. Note that without eBPF/seccomp-bpf the child may
+            // still reach non-whitelisted hosts.
+            let flags = libc::CLONE_NEWUSER | libc::CLONE_NEWNET;
+            let ret = unsafe { libc::unshare(flags) };
+            if ret != 0 {
+                tracing::warn!(
+                    "[IRONCLAD] unshare(CLONE_NEWUSER|CLONE_NEWNET) failed \
+                     for {policy:?} policy -- network filtering is \
+                     best-effort only on this system"
+                );
+            }
         }
     }
+    Ok(())
 }
 
 /// Apply conservative resource limits.

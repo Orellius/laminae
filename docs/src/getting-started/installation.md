@@ -6,7 +6,7 @@ Add Laminae to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-laminae = "0.2"
+laminae = "0.3"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -14,13 +14,13 @@ tokio = { version = "1", features = ["full"] }
 
 ```toml
 # Claude (Anthropic)
-laminae = { version = "0.2", features = ["anthropic"] }
+laminae = { version = "0.3", features = ["anthropic"] }
 
 # OpenAI / Groq / Together / DeepSeek / local
-laminae = { version = "0.2", features = ["openai"] }
+laminae = { version = "0.3", features = ["openai"] }
 
 # All backends
-laminae = { version = "0.2", features = ["all-backends"] }
+laminae = { version = "0.3", features = ["all-backends"] }
 ```
 
 ## Individual Layers
@@ -29,15 +29,15 @@ Pick only what you need:
 
 ```toml
 [dependencies]
-laminae-psyche = "0.2"       # Cognitive pipeline
-laminae-persona = "0.2"      # Voice extraction & enforcement
-laminae-cortex = "0.2"       # Learning loop
-laminae-shadow = "0.2"       # Red-teaming
-laminae-glassbox = "0.2"     # I/O containment
-laminae-ironclad = "0.2"     # Process sandbox
-laminae-ollama = "0.2"       # Ollama client
-laminae-anthropic = "0.2"    # Claude EgoBackend
-laminae-openai = "0.2"       # OpenAI-compatible EgoBackend
+laminae-psyche = "0.3"       # Cognitive pipeline
+laminae-persona = "0.3"      # Voice extraction & enforcement
+laminae-cortex = "0.3"       # Learning loop
+laminae-shadow = "0.3"       # Red-teaming
+laminae-glassbox = "0.3"     # I/O containment
+laminae-ironclad = "0.3"     # Process sandbox
+laminae-ollama = "0.3"       # Ollama client
+laminae-anthropic = "0.3"    # Claude EgoBackend
+laminae-openai = "0.3"       # OpenAI-compatible EgoBackend
 ```
 
 ## Requirements
