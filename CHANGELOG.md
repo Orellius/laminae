@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-03-11
+
 ### Changed
 - MSRV raised from 1.75 to 1.83 (required by `icu_provider` 2.x, transitive dep of `reqwest` 0.12).
+
+### Fixed
+- Windows: add `Win32_Security` feature for `CreateJobObjectW` (was missing, caused compile failure).
+- Windows: fix null handle checks for `windows-sys` 0.59 `HANDLE` type change (`*mut c_void` vs `isize`).
+- Windows: re-export `assign_job_object_to_pid` from sandbox module (was dead code warning with `-Dwarnings`).
 
 ## [0.4.0] - 2026-03-11
 
@@ -100,7 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Workspace restructured into independent crates.
 
-[Unreleased]: https://github.com/orellius/laminae/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/orellius/laminae/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/orellius/laminae/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/orellius/laminae/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/orellius/laminae/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/orellius/laminae/compare/v0.2.0...v0.3.0
