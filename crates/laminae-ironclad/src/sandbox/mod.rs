@@ -26,7 +26,7 @@ pub use macos::SeatbeltProvider;
 pub use linux::LinuxSandboxProvider;
 
 #[cfg(target_os = "windows")]
-pub use windows::WindowsSandboxProvider;
+pub use windows::{assign_job_object_to_pid, WindowsSandboxProvider};
 
 /// Describes the network access policy for a sandboxed process.
 #[derive(Debug, Clone, PartialEq, Eq)]
