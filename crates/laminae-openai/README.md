@@ -76,7 +76,7 @@ let config = OpenAIConfig {
     temperature: Some(0.7),
     ..Default::default()
 };
-let openai = OpenAIBackend::with_config(config);
+let openai = OpenAIBackend::with_config(config)?;
 ```
 
 Or use the builder pattern:

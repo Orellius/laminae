@@ -102,6 +102,10 @@ pub enum OpenAIError {
     /// Rate limit exceeded.
     #[error("rate limited: retry after {retry_after_secs}s")]
     RateLimited { retry_after_secs: u64 },
+
+    /// Failed to build the HTTP client (e.g. missing TLS certificates).
+    #[error("HTTP client error: {0}")]
+    HttpClient(String),
 }
 
 // ── Configuration ──
@@ -238,7 +242,7 @@ impl OpenAIBackend {
             api_key: api_key.into(),
             ..Default::default()
         };
-        Self::with_config(config)
+        Self::with_config(config).expect("failed to build HTTP client with default config")
     }
 
     /// Create a backend from the `OPENAI_API_KEY` environment variable.
@@ -268,7 +272,10 @@ impl OpenAIBackend {
             );
         }
 
-        Ok(Self::new(api_key))
+        Ok(Self::with_config(OpenAIConfig {
+            api_key,
+            ..Default::default()
+        })?)
     }
 
     /// Create a backend with full configuration control.
@@ -284,15 +291,16 @@ impl OpenAIBackend {
     ///     max_tokens: Some(2048),
     ///     ..Default::default()
     /// };
-    /// let openai = OpenAIBackend::with_config(config);
+    /// let openai = OpenAIBackend::with_config(config)?;
+    /// # Ok::<(), laminae_openai::OpenAIError>(())
     /// ```
-    pub fn with_config(mut config: OpenAIConfig) -> Self {
+    pub fn with_config(mut config: OpenAIConfig) -> Result<Self, OpenAIError> {
         config.clamp();
         let client = Client::builder()
             .timeout(config.timeout)
             .build()
-            .expect("failed to build HTTP client");
-        Self { client, config }
+            .map_err(|e| OpenAIError::HttpClient(e.to_string()))?;
+        Ok(Self { client, config })
     }
 
     // ── Convenience Constructors for Popular Providers ──
@@ -316,6 +324,7 @@ impl OpenAIBackend {
             base_url: "https://api.groq.com/openai/v1".to_string(),
             ..Default::default()
         })
+        .expect("failed to build HTTP client")
     }
 
     /// Create a backend for [Together AI](https://together.ai).
@@ -337,6 +346,7 @@ impl OpenAIBackend {
             base_url: "https://api.together.xyz/v1".to_string(),
             ..Default::default()
         })
+        .expect("failed to build HTTP client")
     }
 
     /// Create a backend for [DeepSeek](https://deepseek.com).
@@ -358,6 +368,7 @@ impl OpenAIBackend {
             base_url: "https://api.deepseek.com/v1".to_string(),
             ..Default::default()
         })
+        .expect("failed to build HTTP client")
     }
 
     /// Create a backend for a local OpenAI-compatible server.
@@ -383,6 +394,7 @@ impl OpenAIBackend {
             base_url: base_url.into(),
             ..Default::default()
         })
+        .expect("failed to build HTTP client")
     }
 
     /// Set the model to use.

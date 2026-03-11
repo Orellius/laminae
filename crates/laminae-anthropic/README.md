@@ -65,7 +65,7 @@ let claude = ClaudeBackend::with_config(ClaudeConfig {
     model: "claude-sonnet-4-20250514".to_string(),
     max_tokens: 4096,
     ..Default::default()
-});
+})?;
 ```
 
 ## Environment

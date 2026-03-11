@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -70,18 +71,30 @@ pub trait Analyzer: Send + Sync {
 
 /// Static pattern-based analyzer with vulnerability detection rules.
 pub struct StaticAnalyzer {
-    _extra_rules: Vec<ShadowRule>,
+    extra_rules: Vec<CompiledShadowRule>,
 }
 
-struct ShadowRule {
-    _id: &'static str,
-    category: VulnCategory,
-    severity: VulnSeverity,
-    pattern: &'static str,
-    title: &'static str,
-    description: &'static str,
-    cwe: Option<u32>,
-    remediation: &'static str,
+/// A user-defined vulnerability detection rule for the static analyzer.
+///
+/// All string fields accept both `&'static str` (for compile-time rules)
+/// and `String` (for rules loaded from config at runtime) via `Cow`.
+pub struct ShadowRule {
+    /// Unique identifier for the rule.
+    pub id: Cow<'static, str>,
+    /// Vulnerability category this rule detects.
+    pub category: VulnCategory,
+    /// Severity level of findings from this rule.
+    pub severity: VulnSeverity,
+    /// Regex pattern to match against code.
+    pub pattern: Cow<'static, str>,
+    /// Short title for findings.
+    pub title: Cow<'static, str>,
+    /// Detailed description of the vulnerability.
+    pub description: Cow<'static, str>,
+    /// CWE identifier, if applicable.
+    pub cwe: Option<u32>,
+    /// Suggested remediation.
+    pub remediation: Cow<'static, str>,
 }
 
 /// Pre-compiled version of ShadowRule, built once via LazyLock.
@@ -89,10 +102,10 @@ struct CompiledShadowRule {
     category: VulnCategory,
     severity: VulnSeverity,
     regex: Regex,
-    title: &'static str,
-    description: &'static str,
+    title: Cow<'static, str>,
+    description: Cow<'static, str>,
     cwe: Option<u32>,
-    remediation: &'static str,
+    remediation: Cow<'static, str>,
 }
 
 /// Analyzer for dependency-related vulnerabilities in code output.
@@ -118,6 +131,7 @@ struct DepRule {
     title: &'static str,
     description: &'static str,
     severity: VulnSeverity,
+    category: VulnCategory,
     cwe: Option<u32>,
     remediation: &'static str,
 }
@@ -128,6 +142,7 @@ struct CompiledDepRule {
     title: &'static str,
     description: &'static str,
     severity: VulnSeverity,
+    category: VulnCategory,
     cwe: Option<u32>,
     remediation: &'static str,
 }
@@ -138,6 +153,7 @@ const DEP_RULES: &[DepRule] = &[
         title: "Insecure package index (HTTP)",
         description: "Installing packages from an unencrypted HTTP source enables MITM attacks.",
         severity: VulnSeverity::High,
+        category: VulnCategory::DataExfiltration,
         cwe: Some(829),
         remediation: "Always use HTTPS for package indices.",
     },
@@ -147,6 +163,7 @@ const DEP_RULES: &[DepRule] = &[
         description:
             "Enabling install scripts on untrusted packages risks arbitrary code execution.",
         severity: VulnSeverity::Medium,
+        category: VulnCategory::CommandInjection,
         cwe: Some(829),
         remediation: "Audit packages before enabling install scripts.",
     },
@@ -156,6 +173,7 @@ const DEP_RULES: &[DepRule] = &[
         description:
             "This package has a known supply chain attack history. Verify the version is safe.",
         severity: VulnSeverity::High,
+        category: VulnCategory::AdversarialLogic,
         cwe: Some(506),
         remediation: "Pin to a verified safe version and audit the package.",
     },
@@ -164,6 +182,7 @@ const DEP_RULES: &[DepRule] = &[
         title: "Potentially outdated dependency version",
         description: "Very old versions of popular packages often contain known vulnerabilities.",
         severity: VulnSeverity::Medium,
+        category: VulnCategory::LogicFlaw,
         cwe: Some(1104),
         remediation: "Update to the latest stable version.",
     },
@@ -172,6 +191,7 @@ const DEP_RULES: &[DepRule] = &[
         title: "Pipe-to-shell installation",
         description: "Downloading and executing scripts in one step bypasses all verification.",
         severity: VulnSeverity::Critical,
+        category: VulnCategory::CommandInjection,
         cwe: Some(829),
         remediation: "Download first, verify checksum/signature, then execute.",
     },
@@ -180,6 +200,7 @@ const DEP_RULES: &[DepRule] = &[
         title: "Git dependency over unencrypted protocol",
         description: "Git dependencies over HTTP or git:// are vulnerable to MITM.",
         severity: VulnSeverity::Medium,
+        category: VulnCategory::DataExfiltration,
         cwe: Some(319),
         remediation: "Use HTTPS or SSH for git dependencies.",
     },
@@ -211,7 +232,7 @@ impl Analyzer for DependencyAnalyzer {
                     let line_num = text[..mat.start()].matches('\n').count() + 1;
                     findings.push(VulnFinding {
                         id: generate_finding_id(),
-                        category: VulnCategory::Unknown,
+                        category: rule.category,
                         severity: rule.severity,
                         title: rule.title.to_string(),
                         description: rule.description.to_string(),
@@ -336,6 +357,7 @@ static COMPILED_DEP_RULES: LazyLock<Vec<CompiledDepRule>> = LazyLock::new(|| {
                 title: rule.title,
                 description: rule.description,
                 severity: rule.severity,
+                category: rule.category,
                 cwe: rule.cwe,
                 remediation: rule.remediation,
             })
@@ -414,8 +436,20 @@ fn redact_secret(s: &str) -> String {
     format!("{}***{}", &s[..8], &s[s.len() - 4..])
 }
 
-const SHADOW_RULES: &[ShadowRule] = &[
-    ShadowRule {
+/// Internal rule definition using static strings (for hardcoded rules only).
+struct InternalRule {
+    _id: &'static str,
+    category: VulnCategory,
+    severity: VulnSeverity,
+    pattern: &'static str,
+    title: &'static str,
+    description: &'static str,
+    cwe: Option<u32>,
+    remediation: &'static str,
+}
+
+const SHADOW_RULES: &[InternalRule] = &[
+    InternalRule {
         _id: "sqli-string-concat",
         category: VulnCategory::SqlInjection,
         severity: VulnSeverity::Critical,
@@ -425,7 +459,7 @@ const SHADOW_RULES: &[ShadowRule] = &[
         cwe: Some(89),
         remediation: "Use parameterized queries or an ORM.",
     },
-    ShadowRule {
+    InternalRule {
         _id: "sqli-format-string",
         category: VulnCategory::SqlInjection,
         severity: VulnSeverity::Critical,
@@ -436,7 +470,7 @@ const SHADOW_RULES: &[ShadowRule] = &[
         cwe: Some(89),
         remediation: "Use parameterized queries.",
     },
-    ShadowRule {
+    InternalRule {
         _id: "hardcoded-password",
         category: VulnCategory::HardcodedSecret,
         severity: VulnSeverity::High,
@@ -446,7 +480,7 @@ const SHADOW_RULES: &[ShadowRule] = &[
         cwe: Some(798),
         remediation: "Use environment variables or a secrets manager.",
     },
-    ShadowRule {
+    InternalRule {
         _id: "hardcoded-aws-key",
         category: VulnCategory::HardcodedSecret,
         severity: VulnSeverity::Critical,
@@ -456,7 +490,7 @@ const SHADOW_RULES: &[ShadowRule] = &[
         cwe: Some(798),
         remediation: "Remove the key, rotate it in AWS IAM, use IAM roles.",
     },
-    ShadowRule {
+    InternalRule {
         _id: "hardcoded-private-key",
         category: VulnCategory::HardcodedSecret,
         severity: VulnSeverity::Critical,
@@ -466,7 +500,7 @@ const SHADOW_RULES: &[ShadowRule] = &[
         cwe: Some(321),
         remediation: "Remove the key, rotate it, store securely.",
     },
-    ShadowRule {
+    InternalRule {
         _id: "path-traversal-user-input",
         category: VulnCategory::PathTraversal,
         severity: VulnSeverity::High,
@@ -476,7 +510,7 @@ const SHADOW_RULES: &[ShadowRule] = &[
         cwe: Some(22),
         remediation: "Canonicalize paths and verify they remain within allowed directories.",
     },
-    ShadowRule {
+    InternalRule {
         _id: "xss-innerhtml",
         category: VulnCategory::XssReflected,
         severity: VulnSeverity::High,
@@ -486,7 +520,7 @@ const SHADOW_RULES: &[ShadowRule] = &[
         cwe: Some(79),
         remediation: "Use textContent, sanitize HTML with DOMPurify.",
     },
-    ShadowRule {
+    InternalRule {
         _id: "unsafe-deserialize",
         category: VulnCategory::InsecureDeserialization,
         severity: VulnSeverity::High,
@@ -496,7 +530,7 @@ const SHADOW_RULES: &[ShadowRule] = &[
         cwe: Some(502),
         remediation: "Use safe deserialization (yaml.safe_load, JSON).",
     },
-    ShadowRule {
+    InternalRule {
         _id: "weak-hash-md5",
         category: VulnCategory::CryptoWeakness,
         severity: VulnSeverity::Medium,
@@ -506,7 +540,7 @@ const SHADOW_RULES: &[ShadowRule] = &[
         cwe: Some(328),
         remediation: "Use SHA-256 or better.",
     },
-    ShadowRule {
+    InternalRule {
         _id: "infinite-loop-risk",
         category: VulnCategory::ResourceAbuse,
         severity: VulnSeverity::Medium,
@@ -529,10 +563,10 @@ static COMPILED_SHADOW_RULES: LazyLock<Vec<CompiledShadowRule>> = LazyLock::new(
                     category: rule.category,
                     severity: rule.severity,
                     regex,
-                    title: rule.title,
-                    description: rule.description,
+                    title: Cow::Borrowed(rule.title),
+                    description: Cow::Borrowed(rule.description),
                     cwe: rule.cwe,
-                    remediation: rule.remediation,
+                    remediation: Cow::Borrowed(rule.remediation),
                 })
         })
         .collect()
@@ -541,8 +575,30 @@ static COMPILED_SHADOW_RULES: LazyLock<Vec<CompiledShadowRule>> = LazyLock::new(
 impl StaticAnalyzer {
     pub fn new() -> Self {
         Self {
-            _extra_rules: Vec::new(),
+            extra_rules: Vec::new(),
         }
+    }
+
+    /// Create a static analyzer with additional custom rules.
+    ///
+    /// Returns an error if any rule's pattern is an invalid regex.
+    pub fn with_extra_rules(rules: Vec<ShadowRule>) -> Result<Self, regex::Error> {
+        let mut compiled = Vec::with_capacity(rules.len());
+        for rule in rules {
+            let regex = Regex::new(&rule.pattern)?;
+            compiled.push(CompiledShadowRule {
+                category: rule.category,
+                severity: rule.severity,
+                regex,
+                title: rule.title,
+                description: rule.description,
+                cwe: rule.cwe,
+                remediation: rule.remediation,
+            });
+        }
+        Ok(Self {
+            extra_rules: compiled,
+        })
     }
 }
 
@@ -597,8 +653,10 @@ impl Analyzer for StaticAnalyzer {
             }))
             .collect();
 
+        let all_rules = compiled.iter().chain(self.extra_rules.iter());
+
         for (source_name, text) in &targets {
-            for rule in compiled {
+            for rule in all_rules.clone() {
                 for mat in rule.regex.find_iter(text) {
                     let line_num = text[..mat.start()].matches('\n').count() + 1;
                     let evidence = truncate_evidence(mat.as_str());
@@ -619,14 +677,17 @@ impl Analyzer for StaticAnalyzer {
             }
         }
 
-        // Deduplicate
+        // Deduplicate (by category + title + evidence to avoid collapsing different rules)
         findings.sort_by(|a, b| {
             a.category
                 .to_string()
                 .cmp(&b.category.to_string())
+                .then(a.title.cmp(&b.title))
                 .then(a.evidence.cmp(&b.evidence))
         });
-        findings.dedup_by(|a, b| a.category == b.category && a.evidence == b.evidence);
+        findings.dedup_by(|a, b| {
+            a.category == b.category && a.title == b.title && a.evidence == b.evidence
+        });
 
         Ok(findings)
     }

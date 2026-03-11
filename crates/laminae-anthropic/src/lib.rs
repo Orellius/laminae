@@ -83,6 +83,10 @@ pub enum ClaudeError {
     /// Rate limit exceeded.
     #[error("rate limited: retry after {retry_after_secs}s")]
     RateLimited { retry_after_secs: u64 },
+
+    /// Failed to build the HTTP client (e.g. missing TLS certificates).
+    #[error("HTTP client error: {0}")]
+    HttpClient(String),
 }
 
 // ── Configuration ──
@@ -213,7 +217,7 @@ impl ClaudeBackend {
             api_key: api_key.into(),
             ..Default::default()
         };
-        Self::with_config(config)
+        Self::with_config(config).expect("failed to build HTTP client with default config")
     }
 
     /// Create a backend from the `ANTHROPIC_API_KEY` environment variable.
@@ -245,7 +249,10 @@ impl ClaudeBackend {
             );
         }
 
-        Ok(Self::new(api_key))
+        Ok(Self::with_config(ClaudeConfig {
+            api_key,
+            ..Default::default()
+        })?)
     }
 
     /// Create a backend with full configuration control.
@@ -261,15 +268,16 @@ impl ClaudeBackend {
     ///     max_tokens: 8192,
     ///     ..Default::default()
     /// };
-    /// let claude = ClaudeBackend::with_config(config);
+    /// let claude = ClaudeBackend::with_config(config)?;
+    /// # Ok::<(), laminae_anthropic::ClaudeError>(())
     /// ```
-    pub fn with_config(mut config: ClaudeConfig) -> Self {
+    pub fn with_config(mut config: ClaudeConfig) -> Result<Self, ClaudeError> {
         config.clamp();
         let client = Client::builder()
             .timeout(config.timeout)
             .build()
-            .expect("failed to build HTTP client");
-        Self { client, config }
+            .map_err(|e| ClaudeError::HttpClient(e.to_string()))?;
+        Ok(Self { client, config })
     }
 
     /// Set the model to use.
